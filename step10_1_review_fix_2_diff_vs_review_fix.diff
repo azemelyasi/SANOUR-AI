@@ -1,0 +1,1456 @@
+diff -ruN a/SANOUR_AI/README.md b/SANOUR_AI/README.md
+--- a/SANOUR_AI/README.md	2026-11-05 18:03:32.262635943 +0000
++++ b/SANOUR_AI/README.md	2026-11-05 18:03:32.262635943 +0000
+@@ -88,50 +88,60 @@
+ against a test-only mock transport. That is not a connection to OpenAI. No test in this repository
+ has contacted the OpenAI API.
+ 
+-## OpenAI adapter security boundary (step 10.1)
++## OpenAI adapter security boundary
++
++The adapter is an offline, unwired provider. It is not connected to OpenAI, and nothing in this
++repository makes a real request.
+ 
+ - **Endpoint pinned:** the adapter always uses `https://api.openai.com/v1`. `OPENAI_BASE_URL` is
+   not honored.
+-- **Fail closed:** the adapter refuses to start if any of these variables is set, even empty:
+-  `OPENAI_BASE_URL`, `OPENAI_CUSTOM_HEADERS`, `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`. The error names
+-  the variable and never prints its value.
+-- **Headers:** the `Authorization` header always carries the adapter's key. `OPENAI_CUSTOM_HEADERS`
+-  is blocked, so it cannot replace it.
+-- **Logging:** `OPENAI_LOG` is still read by the SDK, which only changes log verbosity. The SDK
+-  redacts authorization headers. Tests check debug-level logs on success and error paths for the
+-  key. Keep `OPENAI_LOG` off in production anyway.
+-- **Client validation:** every SDK client is validated when the provider is constructed, including
+-  clients built by the adapter's own factory. There is no flag to skip validation in production.
+-  The check requires: the adapter's key (`auth_headers` equals `Bearer <key>`), the pinned
+-  endpoint, no organization or project, retries disabled, no custom query parameters, and an HTTP
+-  transport built with `trust_env=False`.
+-- **Header policy:** every header on the client, both the merged `default_headers` and the
+-  caller-supplied `_custom_headers`, is checked by name. Accepted: SDK-generated headers `Accept`,
+-  `Content-Type`, `User-Agent`, `X-Stainless-*`, and `OpenAI-Organization`/`OpenAI-Project` while
+-  they are unset. Rejected: `Authorization` (always the adapter's key), any `OpenAI-Organization` or
+-  `OpenAI-Project` value that is set, and any other name (such as `Host` or `X-Probe`), which is a
+-  custom header. Custom query parameters are rejected too. The adapter sends no per-request
+-  headers, so these checks cover every header the SDK sends.
+-- **Test-only injection:** the test suite subclasses the provider in the test file to skip
+-  validation for fake clients. That subclass is not part of `src/`.
+-- **Proxy and TLS:** `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, `SSL_CERT_FILE`, and
+-  `SSL_CERT_DIR` are ignored by the operational transport (`trust_env=False`). Verified: with
+-  `HTTPS_PROXY` set, a default httpx2 client routes OpenAI traffic through the proxy, and the
+-  adapter's client does not. Proxy support, if ever needed, must be an explicit, reviewed setting.
+-- **Environment audit (SDK 3.45.0, verified by code reading and mock-transport tests):**
+-
+-  | Variable | Effect on this adapter | Action |
+-  |---|---|---|
+-  | `OPENAI_BASE_URL` | Redirects requests (key sent to host) | Blocked (fail closed) |
+-  | `OPENAI_CUSTOM_HEADERS` | Injects or replaces headers | Blocked |
+-  | `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID` | Adds billing headers | Blocked |
+-  | `OPENAI_ADMIN_KEY` | Populates `admin_api_key`; Responses auth unchanged (tested) | Not blocked |
+-  | `OPENAI_WEBHOOK_SECRET` | Used only for webhook verification; auth unchanged (tested) | Not blocked |
+-  | `OPENAI_API_TYPE`, `OPENAI_API_VERSION` | Module-level/Azure switches; client stays `openai.OpenAI` (tested) | Not blocked |
+-  | `OPENAI_API_KEY` | Not used; the adapter always passes its own key | Not blocked |
+-  | `OPENAI_LOG` | Log verbosity; authorization header redacted (tested) | Not blocked |
+-  | `HTTP(S)_PROXY`, `ALL_PROXY`, `NO_PROXY`, `SSL_CERT_*` | Route traffic / change trust store | Ignored (`trust_env=False`) |
+-
+-- **Tests against the real SDK** use a test-only mock transport. They do not connect to OpenAI.
+-  No test here uses a real key or network.
+-- **Tests:** the test suite assumes the four blocked variables are unset in the environment.
++- **Fail closed on environment:** the adapter refuses to start if `OPENAI_BASE_URL`,
++  `OPENAI_CUSTOM_HEADERS`, `OPENAI_ORG_ID`, or `OPENAI_PROJECT_ID` is set, even if empty. The error
++  names the variable and never prints its value.
++- **Validation, not a flag:** `validate_client()` runs directly in the constructor, so a subclass
++  cannot skip it. It runs again before every request. A client changed after construction is
++  refused with a non-retryable `ProviderError` before any request is sent.
++- **What validation requires:** the adapter's key (`auth_headers` equals `Bearer <key>`), the
++  pinned endpoint, no organization or project, retries disabled, no custom query parameters, and no
++  alternate credential (`workload_identity`).
++- **Header policy (exact allowlist, SDK 3.45.0):** the only accepted header names are `accept`,
++  `content-type`, `user-agent`, `x-stainless-lang`, `x-stainless-package-version`, `x-stainless-os`,
++  `x-stainless-arch`, `x-stainless-runtime`, `x-stainless-runtime-version`, `x-stainless-async`, plus
++  `openai-organization` and `openai-project` while they are unset. There is no prefix rule.
++  Rejected: `Authorization` (always the adapter's key), any organization or project value that is
++  set, and any other name, for example `X-Stainless-Probe`, `X-Probe`, or `Host`. This applies to
++  both the merged default headers and caller-supplied custom headers.
++- **Transport policy:** the only accepted transport class is the httpx2 default transport.
++  Rejected: an explicit proxy on the client (`_mounts`), an explicit proxy on the transport, TLS
++  verification disabled, environment proxy or certificate trust enabled, and any unknown transport
++  type. Unknown transports are refused until a reviewer adds them to the policy.
++- **Environment transport:** `HTTP(S)_PROXY`, `ALL_PROXY`, `NO_PROXY`, `SSL_CERT_FILE`, and
++  `SSL_CERT_DIR` are ignored (`trust_env=False`). Verified: with `HTTPS_PROXY` set, a plain httpx2
++  client routes OpenAI traffic through the proxy, and the adapter's client does not.
++- **Logging:** `OPENAI_LOG` is read by the SDK and only changes verbosity. The SDK redacts the
++  authorization header. Debug logs on success and error paths were checked for the key. Keep
++  `OPENAI_LOG` off in production anyway.
++
++| Variable | Effect on this adapter | Action |
++|---|---|---|
++| `OPENAI_BASE_URL` | Redirects requests (key sent to host) | Blocked (fail closed) |
++| `OPENAI_CUSTOM_HEADERS` | Injects or replaces headers | Blocked |
++| `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID` | Adds billing headers | Blocked |
++| `OPENAI_ADMIN_KEY` | Populates `admin_api_key`; Responses auth unchanged (tested) | Not blocked |
++| `OPENAI_WEBHOOK_SECRET` | Webhook verification only; auth unchanged (tested) | Not blocked |
++| `OPENAI_API_TYPE`, `OPENAI_API_VERSION` | Module-level or Azure switches; client stays `openai.OpenAI` (tested) | Not blocked |
++| `OPENAI_API_KEY` | Not used; the adapter always passes its own key | Not blocked |
++| `OPENAI_LOG` | Log verbosity; authorization header redacted (tested) | Not blocked |
++| `HTTP(S)_PROXY`, `ALL_PROXY`, `NO_PROXY`, `SSL_CERT_*` | Route traffic or change trust store | Ignored (`trust_env=False`) |
++
++## Test suite and what it proves
++
++- **SDK-free tests** always run: key handling, environment guard, header allowlist (pure policy),
++  and constructor shape.
++- **SDK-backed tests** need `openai==3.45.0` and `httpx2==2.13.1` installed. They build real
++  `openai.OpenAI` clients on `httpx2.MockTransport`. The mock transport is allowed only inside the
++  test suite, through a test-only override of the transport policy. The production policy accepts
++  only the httpx2 default transport. These tests make no network connection and use no real key.
++- **Real-network tests:** none. No test in this repository has contacted the OpenAI API.
++- **Skips:** without the SDK installed, the SDK-backed tests are skipped and reported as skipped.
++  They are not counted as passed.
+diff -ruN a/SANOUR_AI/src/sanour_ai/providers/openai_provider.py b/SANOUR_AI/src/sanour_ai/providers/openai_provider.py
+--- a/SANOUR_AI/src/sanour_ai/providers/openai_provider.py	2026-11-05 18:03:32.262635943 +0000
++++ b/SANOUR_AI/src/sanour_ai/providers/openai_provider.py	2026-11-05 18:03:32.262635943 +0000
+@@ -12,6 +12,7 @@
+ from __future__ import annotations
+ 
+ import os
++import ssl
+ import time
+ from collections.abc import Callable, Mapping
+ from dataclasses import dataclass
+@@ -72,11 +73,22 @@
+ # Endpoint is pinned in code. The environment cannot redirect requests or replace headers.
+ PINNED_BASE_URL = "https://api.openai.com/v1"
+ BLOCKED_ENV_VARS = ("OPENAI_BASE_URL", "OPENAI_CUSTOM_HEADERS", "OPENAI_ORG_ID", "OPENAI_PROJECT_ID")
+-# Header policy. The adapter accepts only headers the SDK generates itself. Anything else is a
+-# custom header and is rejected, because a custom header could change routing, auth, or billing.
+-SDK_DEFAULT_HEADER_NAMES = frozenset({"accept", "content-type", "user-agent"})
+-SDK_DEFAULT_HEADER_PREFIXES = ("x-stainless-",)
+-# Organization and project are SDK defaults only while unset (value is the SDK's Omit sentinel).
++
++# Exact header names the SDK 3.45.0 generates for every request (lowercase). Nothing else is
++# accepted. There is no prefix rule, so a caller cannot add headers such as X-Stainless-Probe.
++SDK_DEFAULT_HEADER_NAMES = frozenset({
++    "accept",
++    "content-type",
++    "user-agent",
++    "x-stainless-lang",
++    "x-stainless-package-version",
++    "x-stainless-os",
++    "x-stainless-arch",
++    "x-stainless-runtime",
++    "x-stainless-runtime-version",
++    "x-stainless-async",
++})
++# The SDK sends these only while unset (value is its Omit sentinel). A string value is an override.
+ SDK_OMITTABLE_HEADER_NAMES = frozenset({"openai-organization", "openai-project"})
+ 
+ 
+@@ -101,8 +113,18 @@
+     return SecretStr(raw.strip())
+ 
+ 
++def _trusted_transport_types() -> tuple[type, ...]:
++    """Transport classes the adapter accepts. Production accepts only the httpx2 default transport.
++
++    Unknown transports are refused until a reviewer adds them here.
++    """
++    import httpx2
++
++    return (httpx2.HTTPTransport,)
++
++
+ def _default_timeout(remaining: float) -> Any:
+-    import httpx2  # the SDK's transport package (pinned in pyproject extra 'openai')
++    import httpx2  # the SDK's transport timeout type
+ 
+     return httpx2.Timeout(
+         connect=min(CONNECT_TIMEOUT_S, remaining),
+@@ -116,7 +138,7 @@
+     import httpx2
+ 
+     # trust_env=False: HTTP(S)_PROXY, ALL_PROXY, NO_PROXY, SSL_CERT_FILE and SSL_CERT_DIR are
+-    # ignored. Operational transport is explicit and carries no environment-driven routing.
++    # ignored. The transport itself is validated on every request by validate_client().
+     return httpx2.Client(trust_env=False)
+ 
+ 
+@@ -139,15 +161,31 @@
+         return "authorization header override is set"
+     if lname in SDK_OMITTABLE_HEADER_NAMES:
+         return "organization or project header is set" if isinstance(value, str) else None
+-    if lname in SDK_DEFAULT_HEADER_NAMES or lname.startswith(SDK_DEFAULT_HEADER_PREFIXES):
++    if lname in SDK_DEFAULT_HEADER_NAMES:
+         return None
+     return "custom header is set"
+ 
+ 
++def _transport_problems(transport: Any) -> list[str]:
++    import httpx2
++
++    if not isinstance(transport, _trusted_transport_types()):
++        return ["transport type is not trusted"]
++    if isinstance(transport, httpx2.HTTPTransport):
++        pool = getattr(transport, "_pool", None)
++        if getattr(pool, "_proxy_url", None) is not None:
++            return ["transport uses an explicit proxy"]
++        ctx = getattr(pool, "_ssl_context", None)
++        if ctx is None or ctx.verify_mode != ssl.CERT_REQUIRED or not ctx.check_hostname:
++            return ["TLS verification is disabled"]
++    return []
++
++
+ def validate_client(client: Any, api_key: SecretStr) -> None:
+-    """Accept only a pinned, key-matched, header-clean SDK client with no env transport overrides.
++    """Accept only a pinned, key-matched, header-clean SDK client on a trusted transport.
+ 
+-    Fails closed. Error text names the failed checks, never the values involved.
++    Runs at construction and before every request. Fails closed. Error text names the failed
++    checks, never the values involved.
+     """
+     try:
+         import openai
+@@ -158,10 +196,10 @@
+     if not isinstance(client, openai.OpenAI):
+         problems.append("not an SDK client built by this adapter")
+     else:
+-        if getattr(client, "auth_headers", None) != {"Authorization": "Bearer " + api_key.get_secret_value()}:
+-            problems.append("authorization does not come from the adapter key")
+         if getattr(client, "api_key", None) != api_key.get_secret_value():
+             problems.append("api key does not match the adapter key")
++        if getattr(client, "auth_headers", None) != {"Authorization": "Bearer " + api_key.get_secret_value()}:
++            problems.append("authorization does not come from the adapter key")
+         if str(getattr(client, "base_url", "")).rstrip("/") != PINNED_BASE_URL:
+             problems.append("endpoint is not the pinned endpoint")
+         if getattr(client, "organization", None) is not None or getattr(client, "project", None) is not None:
+@@ -174,8 +212,7 @@
+             problems.append("an alternate credential is set")
+         if getattr(client, "default_query", {}):
+             problems.append("custom query parameters are set")
+-        # The SDK stores caller-supplied headers in _custom_headers and the merged set in
+-        # default_headers. Both are checked name by name against the SDK allowlist.
++        # Both the merged default_headers and caller-supplied _custom_headers are checked by name.
+         header_problems: list[str] = []
+         for source in (getattr(client, "default_headers", {}), getattr(client, "_custom_headers", {})):
+             for name, value in source.items():
+@@ -184,8 +221,14 @@
+                     header_problems.append(problem)
+         problems.extend(header_problems)
+         http = getattr(client, "_client", None)
+-        if getattr(http, "trust_env", True) is not False:
+-            problems.append("environment proxy or TLS settings are enabled")
++        if http is None:
++            problems.append("no HTTP client")
++        else:
++            if getattr(http, "_trust_env", True) is not False:
++                problems.append("environment proxy or TLS settings are enabled")
++            if getattr(http, "_mounts", None):
++                problems.append("explicit proxy or per-host transport is configured")
++            problems.extend(_transport_problems(getattr(http, "_transport", None)))
+     if problems:
+         raise ConfigError("client rejected: " + "; ".join(problems))
+ 
+@@ -204,15 +247,14 @@
+         check_environment()  # SDK clients read the environment when they are built
+         if client is None:
+             client = _build_default_client(api_key)
+-        # Every client is validated here, including factory-built ones. No flag skips it.
+-        self._check_client(client, api_key)
++        # Validation is called directly here, not through an overridable method, so a subclass
++        # cannot skip it. The same check runs again before every request.
++        validate_client(client, api_key)
++        self._api_key = api_key
+         self._client = client
+         self._errors = errors if errors is not None else default_sdk_error_types()
+         self._timeout_factory = timeout_factory or _default_timeout
+ 
+-    def _check_client(self, client: Any, api_key: SecretStr) -> None:
+-        validate_client(client, api_key)
+-
+     def generate(self, call: ModelCall) -> ModelResult:
+         if call.deadline is None:
+             raise ProviderError("request has no deadline", retryable=False)
+@@ -220,6 +262,12 @@
+         if remaining <= 0:
+             # Fails before any network I/O.
+             raise ProviderError("deadline expired before provider call", retryable=True)
++        try:
++            # Re-check the client and its headers and transport. Changes after construction are
++            # caught here, before any request is sent.
++            validate_client(self._client, self._api_key)
++        except ConfigError:
++            raise ProviderError("client configuration changed; request refused", retryable=False) from None
+ 
+         timeout = self._timeout_factory(remaining)
+         try:
+diff -ruN a/SANOUR_AI/tests/unit/test_openai_provider.py b/SANOUR_AI/tests/unit/test_openai_provider.py
+--- a/SANOUR_AI/tests/unit/test_openai_provider.py	2026-11-05 18:03:32.262635943 +0000
++++ b/SANOUR_AI/tests/unit/test_openai_provider.py	2026-11-05 18:03:32.262635943 +0000
+@@ -1,9 +1,13 @@
+-"""Offline tests for the OpenAI provider. No network, no real key, no real SDK required.
++"""Tests for the OpenAI provider.
+ 
+-The fake client and fake SDK error classes below exist only in this test module.
++Offline only. No network, no real key. Provider tests build real openai.OpenAI clients on
++httpx2.MockTransport. Tests that need the SDK or httpx2 skip cleanly when they are not installed.
++The SDK-free tests always run.
+ """
+ 
+ import importlib.util
++import inspect
++import json
+ import logging
+ import os
+ import subprocess
+@@ -28,56 +32,21 @@
+     WRITE_TIMEOUT_S,
+     OpenAIProvider,
+     RateLimitedError,
+-    SdkErrorTypes,
++    default_sdk_error_types,
+     load_api_key,
+ )
+ 
+ SECRET = "sk-FAKETESTKEY0123456789ABCDEF"  # fake, test-only
+ 
+ 
+-class FakeSdkError(Exception):
+-    def __init__(self, text="raw server text with " + SECRET, status_code=None):
+-        super().__init__(text)
+-        self.status_code = status_code
+-
+-
+-class FakeOpenAIError(FakeSdkError): ...
+-class FakeAuth(FakeOpenAIError): ...
+-class FakePerm(FakeOpenAIError): ...
+-class FakeNotFound(FakeOpenAIError): ...
+-class FakeRateLimit(FakeOpenAIError): ...
+-class FakeInternal(FakeOpenAIError): ...
+-class FakeStatus(FakeOpenAIError): ...
+-class FakeConn(FakeOpenAIError): ...
+-class FakeTimeout(FakeConn): ...  # subclass, as in the real SDK
+-
+-
+-FAKE_ERRORS = SdkErrorTypes(
+-    base=FakeOpenAIError,
+-    authentication=FakeAuth,
+-    permission_denied=FakePerm,
+-    not_found=FakeNotFound,
+-    rate_limit=FakeRateLimit,
+-    internal_server=FakeInternal,
+-    api_timeout=FakeTimeout,
+-    api_connection=FakeConn,
+-    api_status=FakeStatus,
+-)
++def _sdk_available():
++    return (
++        importlib.util.find_spec("openai") is not None
++        and importlib.util.find_spec("httpx2") is not None
++    )
+ 
+ 
+-class FakeClient:
+-    def __init__(self, outcome=None):
+-        self.calls = []
+-        self._outcome = outcome
+-        self.responses = SimpleNamespace(create=self._create)
+-
+-    def _create(self, **kwargs):
+-        self.calls.append(kwargs)
+-        if isinstance(self._outcome, BaseException):
+-            raise self._outcome
+-        if callable(self._outcome):
+-            return self._outcome()
+-        return self._outcome or SimpleNamespace(output_text="hello", model="gpt-test")
++SDK_REQUIRED = unittest.skipUnless(_sdk_available(), "openai and httpx2 not installed; skipped")
+ 
+ 
+ def tuple_timeout(remaining):
+@@ -89,28 +58,24 @@
+     )
+ 
+ 
+-class _TestOnlyUnvalidatedProvider(OpenAIProvider):
+-    """TEST ONLY. Skips client validation so a fake client can drive the adapter.
+-
+-    Defined here, never in src/. Production code always runs the real validation.
+-    """
++def _call(model="gpt-test", seconds=10.0):
++    return ModelCall(model_id=model, prompt="hi", max_output_tokens=64,
++                     deadline=time.monotonic() + seconds)
+ 
+-    def _check_client(self, client, api_key):
+-        return None
+ 
+-
+-def make_provider(outcome=None):
+-    client = FakeClient(outcome)
+-    provider = _TestOnlyUnvalidatedProvider(
+-        SecretStr(SECRET), client=client, errors=FAKE_ERRORS, timeout_factory=tuple_timeout,
+-    )
+-    return provider, client
++def _ok_body(model="gpt-test", text="hello"):
++    body = {
++        "id": "resp_1", "object": "response", "created_at": 0, "status": "completed",
++        "output": [{"type": "message", "id": "m1", "role": "assistant", "status": "completed",
++                    "content": [{"type": "output_text", "text": text, "annotations": []}]}],
++        "parallel_tool_calls": False, "tool_choice": "auto", "tools": [],
++    }
++    if model is not None:
++        body["model"] = model
++    return body
+ 
+ 
+-def call(model="gpt-test", seconds=5.0):
+-    return ModelCall(
+-        model_id=model, prompt="hi", max_output_tokens=64, deadline=time.monotonic() + seconds
+-    )
++# ---------------------------------------------------------------- SDK-free tests (always run)
+ 
+ 
+ class ApiKeyTests(unittest.TestCase):
+@@ -129,210 +94,6 @@
+         self.assertNotIn(SECRET, repr(key))
+         self.assertNotIn(SECRET, str(key))
+ 
+-    def test_key_not_leaked_through_provider_errors(self):
+-        provider, _ = make_provider(FakeAuth("bad key " + SECRET, status_code=401))
+-        with self.assertRaises(ProviderError) as ctx:
+-            provider.generate(call())
+-        self.assertNotIn(SECRET, str(ctx.exception))
+-        self.assertNotIn(SECRET, repr(ctx.exception))
+-
+-    def test_default_client_built_with_zero_retries(self):
+-        fake_openai = mock.Mock()
+-        fake_httpx2 = mock.Mock()
+-        with mock.patch.dict("sys.modules", {"openai": fake_openai, "httpx2": fake_httpx2}):
+-            op._build_default_client(SecretStr(SECRET))
+-        fake_openai.OpenAI.assert_called_once_with(
+-            api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
+-            http_client=fake_httpx2.Client.return_value,
+-        )
+-        fake_httpx2.Client.assert_called_once_with(trust_env=False)
+-
+-
+-class TimeoutTypeTests(unittest.TestCase):
+-    def test_default_timeout_uses_httpx2_with_capped_values(self):
+-        fake_httpx2 = mock.Mock()
+-        with mock.patch.dict(sys.modules, {"httpx2": fake_httpx2}):
+-            op._default_timeout(0.5)
+-        fake_httpx2.Timeout.assert_called_once_with(connect=0.5, read=0.5, write=0.5, pool=0.5)
+-
+-    def test_default_timeout_uses_configured_values_for_large_budget(self):
+-        fake_httpx2 = mock.Mock()
+-        with mock.patch.dict(sys.modules, {"httpx2": fake_httpx2}):
+-            op._default_timeout(60)
+-        fake_httpx2.Timeout.assert_called_once_with(
+-            connect=CONNECT_TIMEOUT_S, read=READ_TIMEOUT_S,
+-            write=WRITE_TIMEOUT_S, pool=POOL_TIMEOUT_S,
+-        )
+-
+-    @unittest.skipUnless(
+-        importlib.util.find_spec("httpx2") is not None,
+-        "httpx2 2.13.1 not installed here; real-type check runs only where it is",
+-    )
+-    def test_real_httpx2_timeout_type(self):
+-        import httpx2
+-
+-        value = op._default_timeout(0.5)
+-        self.assertIsInstance(value, httpx2.Timeout)
+-        self.assertLessEqual(value.read, 0.5)
+-
+-
+-class DeadlineTests(unittest.TestCase):
+-    def test_expired_deadline_fails_before_any_io(self):
+-        provider, client = make_provider()
+-        expired = ModelCall(model_id="gpt-test", prompt="x", max_output_tokens=8,
+-                            deadline=time.monotonic() - 1)
+-        with self.assertRaises(ProviderError) as ctx:
+-            provider.generate(expired)
+-        self.assertTrue(ctx.exception.retryable)
+-        self.assertEqual(client.calls, [])
+-
+-    def test_missing_deadline_fails_before_any_io(self):
+-        provider, client = make_provider()
+-        with self.assertRaises(ProviderError) as ctx:
+-            provider.generate(ModelCall(model_id="gpt-test", prompt="x", max_output_tokens=8))
+-        self.assertFalse(ctx.exception.retryable)
+-        self.assertEqual(client.calls, [])
+-
+-    def test_four_timeouts_capped_by_remaining_budget(self):
+-        provider, client = make_provider()
+-        provider.generate(call(seconds=0.5))
+-        timeout = client.calls[0]["timeout"]
+-        self.assertEqual(len(timeout), 4)
+-        for value in timeout:
+-            self.assertLessEqual(value, 0.5)
+-            self.assertGreater(value, 0)
+-
+-    def test_timeouts_use_configured_values_when_budget_is_large(self):
+-        provider, client = make_provider()
+-        provider.generate(call(seconds=60))
+-        self.assertEqual(
+-            client.calls[0]["timeout"],
+-            (CONNECT_TIMEOUT_S, READ_TIMEOUT_S, WRITE_TIMEOUT_S, POOL_TIMEOUT_S),
+-        )
+-
+-    def test_late_response_is_discarded(self):
+-        def slow():
+-            time.sleep(0.05)
+-            return SimpleNamespace(output_text="late", model="gpt-test")
+-
+-        provider, _ = make_provider(slow)
+-        with self.assertRaises(ProviderError) as ctx:
+-            provider.generate(call(seconds=0.01))
+-        self.assertTrue(ctx.exception.retryable)
+-
+-
+-class RequestShapeTests(unittest.TestCase):
+-    def test_request_arguments(self):
+-        provider, client = make_provider()
+-        provider.generate(call())
+-        self.assertEqual(len(client.calls), 1)
+-        kwargs = client.calls[0]
+-        self.assertEqual(kwargs["model"], "gpt-test")
+-        self.assertEqual(kwargs["input"], "hi")
+-        self.assertEqual(kwargs["max_output_tokens"], 64)
+-        self.assertIs(kwargs["store"], False)
+-
+-    def test_provider_satisfies_contract(self):
+-        provider, _ = make_provider()
+-        self.assertIsInstance(provider, ModelProvider)
+-        self.assertEqual(provider.name, "openai")
+-
+-
+-class ResponseTests(unittest.TestCase):
+-    def test_valid_response(self):
+-        provider, _ = make_provider()
+-        result = provider.generate(call())
+-        self.assertEqual(result, ModelResult(text="hello", model_id="gpt-test"))
+-
+-    def test_mismatched_model_id_is_passed_through_not_rewritten(self):
+-        other = SimpleNamespace(output_text="hi", model="gpt-other")
+-        provider, _ = make_provider(other)
+-        result = provider.generate(call(model="gpt-test"))
+-        self.assertEqual(result.model_id, "gpt-other")
+-        self.assertNotEqual(result.model_id, "gpt-test")
+-
+-    def test_missing_model_id_becomes_empty_and_cannot_match(self):
+-        provider, _ = make_provider(SimpleNamespace(output_text="hi"))
+-        result = provider.generate(call(model="gpt-test"))
+-        self.assertEqual(result.model_id, "")
+-
+-    def test_non_text_output_becomes_empty(self):
+-        provider, _ = make_provider(SimpleNamespace(output_text=None, model="gpt-test"))
+-        self.assertEqual(provider.generate(call()).text, "")
+-
+-
+-class ErrorMappingTests(unittest.TestCase):
+-    def assert_mapped(self, exc, retryable, expected_cls=ProviderError):
+-        provider, client = make_provider(exc)
+-        with self.assertRaises(ProviderError) as ctx:
+-            provider.generate(call())
+-        self.assertIs(type(ctx.exception), expected_cls)
+-        self.assertEqual(ctx.exception.retryable, retryable)
+-        self.assertNotIn(SECRET, str(ctx.exception))
+-        self.assertEqual(len(client.calls), 1)  # zero retries
+-        return ctx.exception
+-
+-    def test_401(self):
+-        self.assert_mapped(FakeAuth(status_code=401), False)
+-
+-    def test_403(self):
+-        self.assert_mapped(FakePerm(status_code=403), False)
+-
+-    def test_404(self):
+-        self.assert_mapped(FakeNotFound(status_code=404), False)
+-
+-    def test_429_is_rate_limited(self):
+-        exc = self.assert_mapped(FakeRateLimit(status_code=429), True, RateLimitedError)
+-        self.assertEqual(exc.error_code, "provider_rate_limited")
+-
+-    def test_5xx(self):
+-        self.assert_mapped(FakeInternal(status_code=503), True)
+-        self.assert_mapped(FakeStatus(status_code=502), True)
+-
+-    def test_connection_error(self):
+-        self.assert_mapped(FakeConn(), True)
+-
+-    def test_timeout_is_checked_before_connection(self):
+-        self.assert_mapped(FakeTimeout(), True)
+-
+-    def test_unknown_exception_is_not_retryable(self):
+-        self.assert_mapped(RuntimeError("boom " + SECRET), False)
+-
+-
+-class GatewayCompatibilityTests(unittest.TestCase):
+-    def setUp(self):
+-        self.profile = ModelProfile(
+-            alias="openai_default",
+-            provider="openai",
+-            model_id="gpt-test",
+-            capabilities=ModelCapabilities(
+-                text_generation=True, max_context_tokens=8192, max_output_tokens=4096
+-            ),
+-            runs_locally=False,
+-        )
+-
+-    def gateway(self, provider):
+-        return ModelGateway({"openai": provider}, max_concurrent_calls=2)
+-
+-    def test_success_through_gateway(self):
+-        provider, _ = make_provider()
+-        result = self.gateway(provider).generate(
+-            self.profile, call(), time.monotonic() + 5
+-        )
+-        self.assertEqual(result.text, "hello")
+-
+-    def test_model_mismatch_rejected_by_gateway(self):
+-        provider, _ = make_provider(SimpleNamespace(output_text="hi", model="gpt-other"))
+-        with self.assertRaises(SanourError) as ctx:
+-            self.gateway(provider).generate(self.profile, call(), time.monotonic() + 5)
+-        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_INVALID_RESPONSE)
+-
+-    def test_missing_model_rejected_by_gateway(self):
+-        provider, _ = make_provider(SimpleNamespace(output_text="hi"))
+-        with self.assertRaises(SanourError) as ctx:
+-            self.gateway(provider).generate(self.profile, call(), time.monotonic() + 5)
+-        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_INVALID_RESPONSE)
+-
+ 
+ class EnvironmentGuardTests(unittest.TestCase):
+     def test_each_blocked_variable_fails_closed_without_echo(self):
+@@ -353,10 +114,7 @@
+     def test_provider_construction_refuses_blocked_environment(self):
+         with mock.patch.dict(os.environ, {"OPENAI_BASE_URL": "https://attacker.example/v1"}):
+             with self.assertRaises(ConfigError):
+-                OpenAIProvider(
+-                    SecretStr(SECRET), client=FakeClient(), errors=FAKE_ERRORS,
+-                    timeout_factory=tuple_timeout,
+-                )
++                OpenAIProvider(SecretStr(SECRET), client=object())
+ 
+     def test_default_builder_checks_before_sdk_is_used(self):
+         fake_openai = mock.Mock()
+@@ -368,230 +126,357 @@
+         fake_openai.OpenAI.assert_not_called()
+ 
+ 
+-def _real_sdk_available():
+-    return (
+-        importlib.util.find_spec("openai") is not None
+-        and importlib.util.find_spec("httpx2") is not None
+-    )
++class HeaderAllowlistTests(unittest.TestCase):
++    """Pure policy checks. The allowlist is exact: no prefix rules."""
++
++    def test_allowlist_is_exact_sdk_3_45_0_names(self):
++        self.assertEqual(
++            op.SDK_DEFAULT_HEADER_NAMES,
++            frozenset({
++                "accept", "content-type", "user-agent",
++                "x-stainless-lang", "x-stainless-package-version", "x-stainless-os",
++                "x-stainless-arch", "x-stainless-runtime", "x-stainless-runtime-version",
++                "x-stainless-async",
++            }),
++        )
++        self.assertFalse(hasattr(op, "SDK_DEFAULT_HEADER_PREFIXES"))
++
++    def test_x_stainless_probe_rejected(self):
++        self.assertEqual(op._header_problem("X-Stainless-Probe", "1"), "custom header is set")
++
++    def test_sdk_header_accepted(self):
++        self.assertIsNone(op._header_problem("X-Stainless-Lang", "python"))
++        self.assertIsNone(op._header_problem("User-Agent", "x"))
++
++    def test_authorization_override_rejected(self):
++        self.assertEqual(op._header_problem("Authorization", "Bearer x"),
++                         "authorization header override is set")
++
++    def test_org_override_rejected_but_omit_accepted(self):
++        self.assertEqual(op._header_problem("OpenAI-Organization", "org-x"),
++                         "organization or project header is set")
++        self.assertIsNone(op._header_problem("OpenAI-Organization", object()))
++
++
++class ConstructorPathTests(unittest.TestCase):
++    """The validation call is direct in __init__ and cannot be skipped by a subclass."""
++
++    def test_production_constructor_has_no_bypass_parameter(self):
++        params = inspect.signature(OpenAIProvider.__init__).parameters
++        self.assertEqual(set(params), {"self", "api_key", "client", "errors", "timeout_factory"})
+ 
++    def test_no_overridable_check_hook_exists(self):
++        self.assertFalse(any("check_client" in name for name in dir(OpenAIProvider)))
+ 
+-@unittest.skipUnless(_real_sdk_available(), "openai and httpx2 not installed; real-SDK tests skipped")
+-class RealSdkSecurityTests(unittest.TestCase):
+-    """Real SDK client with a test-only MockTransport. No network, no real key."""
++    def test_init_calls_validation_directly_and_builds_nothing_when_client_given(self):
++        client = object()
++        placeholder = op.SdkErrorTypes(*([Exception] * 9))  # no SDK import needed
++        with mock.patch.object(op, "validate_client") as validate, mock.patch.object(
++            op, "_build_default_client"
++        ) as build:
++            OpenAIProvider(SecretStr(SECRET), client=client, errors=placeholder)
++        validate.assert_called_once()
++        self.assertIs(validate.call_args.args[0], client)
++        build.assert_not_called()
++
++    def test_unknown_client_rejected_by_production_constructor(self):
++        with self.assertRaises(ConfigError) as ctx:
++            OpenAIProvider(SecretStr(SECRET), client=object())
++        self.assertIn("client rejected", str(ctx.exception))
++        self.assertNotIn(SECRET, str(ctx.exception))
++
++
++# ---------------------------------------------------------------- SDK-backed tests
++
++
++class SdkTestCase(unittest.TestCase):
++    """Allows httpx2.MockTransport for the duration of each test. Test-only policy override."""
+ 
+     def setUp(self):
+         import httpx2
+ 
+-        self.httpx2 = httpx2
+-        self.requests = []
+-        self.responder = lambda req: httpx2.Response(200, json=_ok_body())
+-        patcher = mock.patch.dict(os.environ, {}, clear=False)
++        patcher = mock.patch.object(
++            op, "_trusted_transport_types",
++            return_value=(httpx2.HTTPTransport, httpx2.MockTransport),
++        )
+         patcher.start()
+         self.addCleanup(patcher.stop)
++        env = mock.patch.dict(os.environ, {}, clear=False)
++        env.start()
++        self.addCleanup(env.stop)
+         for name in op.BLOCKED_ENV_VARS:
+             os.environ.pop(name, None)
+ 
+-    def _client(self):
+-        client = op._build_default_client(SecretStr(SECRET))
++    def sdk_client(self, handler, api_key=SECRET):
++        import httpx2
++        import openai
++
++        self.requests = getattr(self, "requests", [])
+ 
+-        def handler(req):
++        def recording(req):
+             self.requests.append(req)
+-            return self.responder(req)
++            return handler(req)
+ 
+-        # Test-only transport swap. Production code never does this.
+-        client._client = self.httpx2.Client(
+-            transport=self.httpx2.MockTransport(handler), trust_env=False
+-        )
+-        return client
++        http = httpx2.Client(transport=httpx2.MockTransport(recording), trust_env=False)
++        return openai.OpenAI(api_key=api_key, base_url=op.PINNED_BASE_URL, max_retries=0,
++                             http_client=http)
++
++    def provider(self, handler, **kwargs):
++        client = self.sdk_client(handler)
++        return OpenAIProvider(SecretStr(SECRET), client=client,
++                              errors=default_sdk_error_types(), timeout_factory=tuple_timeout,
++                              **kwargs), client
+ 
+-    def _provider(self):
+-        from sanour_ai.providers.openai_provider import default_sdk_error_types
++    def ok(self, text="hello", model="gpt-test"):
++        import httpx2
+ 
+-        return OpenAIProvider(
+-            SecretStr(SECRET), client=self._client(), errors=default_sdk_error_types(),
+-            timeout_factory=tuple_timeout,
+-        )
++        return lambda req: httpx2.Response(200, json=_ok_body(model=model, text=text))
+ 
+-    def test_default_client_pins_endpoint_without_org_or_project(self):
+-        client = op._build_default_client(SecretStr(SECRET))
+-        self.assertEqual(str(client.base_url).rstrip("/"), op.PINNED_BASE_URL)
+-        self.assertIsNone(client.organization)
+-        self.assertIsNone(client.project)
+-        self.assertEqual(client.max_retries, 0)
++    def status(self, code, body=None):
++        import httpx2
++
++        payload = body or {"error": {"message": "server text", "type": "x", "code": None}}
++        return lambda req: httpx2.Response(code, json=payload)
+ 
+-    def test_success_request_goes_to_pinned_host_with_adapter_key(self):
+-        provider = self._provider()
++
++@SDK_REQUIRED
++class ProviderBehaviourTests(SdkTestCase):
++    def test_provider_satisfies_contract(self):
++        provider, _ = self.provider(self.ok())
++        self.assertIsInstance(provider, ModelProvider)
++        self.assertEqual(provider.name, "openai")
++
++    def test_success_request_shape_and_parsing(self):
++        provider, _ = self.provider(self.ok())
+         result = provider.generate(_call())
+-        self.assertEqual(result.text, "hello")
++        self.assertEqual(result, ModelResult(text="hello", model_id="gpt-test"))
+         self.assertEqual(len(self.requests), 1)
+         req = self.requests[0]
+         self.assertEqual(req.url.host, "api.openai.com")
++        self.assertTrue(req.url.path.endswith("/responses"))
++        body = json.loads(req.content)
++        self.assertIs(body["store"], False)
++        self.assertEqual(body["model"], "gpt-test")
++        self.assertEqual(body["max_output_tokens"], 64)
+         self.assertEqual(req.headers["authorization"], "Bearer " + SECRET)
+-        self.assertIs(_json_body(req)["store"], False)
+ 
+-    def test_admin_key_env_does_not_replace_authorization(self):
+-        # Probe: OPENAI_ADMIN_KEY is read by the SDK but not blocked. Result is recorded in the report.
+-        with mock.patch.dict(os.environ, {"OPENAI_ADMIN_KEY": "sk-ADMIN-SCRATCH-000"}):
+-            provider = self._provider()
+-            provider.generate(_call())
+-        self.assertEqual(self.requests[0].headers["authorization"], "Bearer " + SECRET)
++    def test_model_mismatch_passed_through_unchanged(self):
++        provider, _ = self.provider(self.ok(model="gpt-test-2024-08-06"))
++        self.assertEqual(provider.generate(_call()).model_id, "gpt-test-2024-08-06")
++
++    def test_missing_model_becomes_empty(self):
++        provider, _ = self.provider(self.ok(model=None))
++        self.assertEqual(provider.generate(_call()).model_id, "")
+ 
+-    def test_error_path_logs_contain_no_key_at_debug_level(self):
+-        self.responder = lambda req: self.httpx2.Response(
+-            401, json={"error": {"message": "bad key " + SECRET, "type": "x", "code": None}}
+-        )
+-        records = _capture_openai_logs(lambda: self._expect_provider_error(self._provider()))
+-        self.assertGreater(len(records), 0, "debug logging produced no records; test is vacuous")
+-        self.assertFalse(any(SECRET in r for r in records))
++    def test_empty_output_becomes_empty_text(self):
++        import httpx2
+ 
+-    def test_success_path_logs_contain_no_key_at_debug_level(self):
+-        records = _capture_openai_logs(lambda: self._provider().generate(_call()))
+-        self.assertGreater(len(records), 0, "debug logging produced no records; test is vacuous")
+-        self.assertFalse(any(SECRET in r for r in records))
++        body = _ok_body()
++        body["output"] = []
++        provider, _ = self.provider(lambda req: httpx2.Response(200, json=body))
++        self.assertEqual(provider.generate(_call()).text, "")
+ 
+-    def test_subprocess_openai_log_debug_leaks_no_key(self):
+-        env = {k: v for k, v in os.environ.items() if k not in op.BLOCKED_ENV_VARS}
+-        env["OPENAI_LOG"] = "debug"
+-        env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
+-        script = (
+-            "import httpx2, time, sys\n"
+-            "from pydantic import SecretStr\n"
+-            "from sanour_ai.providers.openai_provider import _build_default_client, OpenAIProvider\n"
+-            "from sanour_ai.providers.openai_provider import default_sdk_error_types\n"
+-            "from sanour_ai.models.base import ModelCall, ProviderError\n"
+-            f"KEY = {SECRET!r}\n"
+-            "def h(req):\n"
+-            "    return httpx2.Response(401, json={'error': {'message': 'bad ' + KEY, 'type': 'x', 'code': None}})\n"
+-            "c = _build_default_client(SecretStr(KEY))\n"
+-            "c._client = httpx2.Client(transport=httpx2.MockTransport(h), trust_env=False)\n"
+-            "p = OpenAIProvider(SecretStr(KEY), client=c, errors=default_sdk_error_types())\n"
+-            "try:\n"
+-            "    p.generate(ModelCall(model_id='gpt-test', prompt='x', max_output_tokens=8,\n"
+-            "                          deadline=time.monotonic() + 10))\n"
+-            "except ProviderError:\n"
+-            "    pass\n"
+-        )
+-        proc = subprocess.run(
+-            [sys.executable, "-c", script], env=env, capture_output=True, text=True, timeout=60
+-        )
+-        self.assertEqual(proc.returncode, 0, proc.stderr[-500:])
+-        self.assertNotIn(SECRET, proc.stdout + proc.stderr)
+-        self.assertIn("DEBUG", proc.stderr, "OPENAI_LOG=debug produced no debug output")
++    def test_expired_deadline_sends_nothing(self):
++        provider, _ = self.provider(self.ok())
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(ModelCall(model_id="gpt-test", prompt="x", max_output_tokens=8,
++                                        deadline=time.monotonic() - 1))
++        self.assertTrue(ctx.exception.retryable)
++        self.assertEqual(getattr(self, "requests", []), [])
+ 
+-    def _expect_provider_error(self, provider):
+-        with self.assertRaises(ProviderError):
+-            provider.generate(_call())
++    def test_missing_deadline_sends_nothing(self):
++        provider, _ = self.provider(self.ok())
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(ModelCall(model_id="gpt-test", prompt="x", max_output_tokens=8))
++        self.assertFalse(ctx.exception.retryable)
++        self.assertEqual(getattr(self, "requests", []), [])
+ 
+-class ClientInjectionTests(unittest.TestCase):
+-    """The production constructor always validates. Only a test subclass skips validation."""
++    def test_timeouts_capped_by_remaining_budget(self):
++        provider, _ = self.provider(self.ok())
++        provider.generate(_call(seconds=0.5))
++        timeout = self.requests[0].extensions["timeout"]
++        for value in timeout.values():
++            self.assertLessEqual(value, 0.5)
++            self.assertGreater(value, 0)
+ 
+-    def test_production_constructor_has_no_bypass_parameter(self):
+-        import inspect
++    def test_configured_timeouts_used_for_large_budget(self):
++        provider, _ = self.provider(self.ok())
++        provider.generate(_call(seconds=60))
++        timeout = self.requests[0].extensions["timeout"]
++        self.assertAlmostEqual(timeout["connect"], CONNECT_TIMEOUT_S)
++        self.assertAlmostEqual(timeout["pool"], POOL_TIMEOUT_S)
++        self.assertLessEqual(timeout["read"], READ_TIMEOUT_S)
+ 
+-        params = inspect.signature(OpenAIProvider.__init__).parameters
+-        self.assertNotIn("test_only_unvalidated_client", params)
+-        self.assertEqual(
+-            set(params), {"self", "api_key", "client", "errors", "timeout_factory"}
+-        )
++    def test_late_response_is_discarded(self):
++        import httpx2
+ 
+-    def test_fake_client_rejected_by_production_constructor(self):
+-        with self.assertRaises(ConfigError) as ctx:
+-            OpenAIProvider(SecretStr(SECRET), client=FakeClient(), errors=FAKE_ERRORS,
+-                           timeout_factory=tuple_timeout)
+-        self.assertIn("client rejected", str(ctx.exception))
++        def slow(req):
++            time.sleep(0.05)
++            return httpx2.Response(200, json=_ok_body())
++
++        provider, _ = self.provider(slow)
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(_call(seconds=0.01))
++        self.assertTrue(ctx.exception.retryable)
++
++    def test_error_mapping_single_request_each(self):
++        import httpx2
++
++        cases = [
++            (self.status(401), False, "provider rejected credentials"),
++            (self.status(403), False, "provider denied permission"),
++            (self.status(404), False, "provider model or endpoint not found"),
++            (self.status(429), True, "provider rate limited"),
++            (self.status(500), True, "provider server error"),
++            (self.status(503), True, "provider server error"),
++            (_raising(lambda req: httpx2.ConnectError("refused", request=req)),
++             True, "provider connection failed"),
++            (_raising(lambda req: httpx2.ReadTimeout("slow", request=req)),
++             True, "provider call timed out"),
++        ]
++        for handler, retryable, message in cases:
++            with self.subTest(message=message):
++                self.requests = []
++                provider, _ = self.provider(handler)
++                with self.assertRaises(ProviderError) as ctx:
++                    provider.generate(_call())
++                self.assertEqual(ctx.exception.retryable, retryable)
++                self.assertEqual(str(ctx.exception), message)
++                self.assertEqual(len(self.requests), 1, "zero retries: exactly one request")
++
++    def test_rate_limit_maps_to_rate_limited_error(self):
++        provider, _ = self.provider(self.status(429))
++        with self.assertRaises(RateLimitedError) as ctx:
++            provider.generate(_call())
++        self.assertEqual(ctx.exception.error_code, "provider_rate_limited")
++
++    def test_unknown_transport_exception_is_not_retryable(self):
++        def boom(req):
++            raise RuntimeError("boom " + SECRET)
++
++        provider, _ = self.provider(boom)
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(_call())
++        self.assertFalse(ctx.exception.retryable)
++        self.assertEqual(str(ctx.exception), "provider call failed")
+         self.assertNotIn(SECRET, str(ctx.exception))
+ 
+-    def test_test_only_subclass_accepts_fake_client(self):
+-        provider, _ = make_provider()
+-        self.assertEqual(provider.generate(call()).text, "hello")
++    def test_key_not_leaked_through_error_text(self):
++        provider, _ = self.provider(self.status(401, {"error": {"message": "bad " + SECRET,
++                                                               "type": "x", "code": None}}))
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(_call())
++        self.assertNotIn(SECRET, str(ctx.exception))
++        self.assertNotIn(SECRET, repr(ctx.exception))
+ 
++    def test_gateway_success_and_invalid_responses(self):
++        profile = ModelProfile(
++            alias="openai_default", provider="openai", model_id="gpt-test",
++            capabilities=ModelCapabilities(text_generation=True, max_context_tokens=8192,
++                                           max_output_tokens=4096),
++            runs_locally=False,
++        )
+ 
+-def _trusted_sdk_client(**overrides):
+-    import httpx2
+-    import openai
++        def gateway(handler):
++            provider, _ = self.provider(handler)
++            return ModelGateway({"openai": provider}, max_concurrent_calls=2)
+ 
+-    kwargs = dict(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
+-                  http_client=httpx2.Client(trust_env=False))
+-    kwargs.update(overrides)
+-    return openai.OpenAI(**kwargs)
++        self.assertEqual(
++            gateway(self.ok()).generate(profile, _call(), time.monotonic() + 5).text, "hello")
++        with self.assertRaises(SanourError) as ctx:
++            gateway(self.ok(model="gpt-other")).generate(profile, _call(), time.monotonic() + 5)
++        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_INVALID_RESPONSE)
++        with self.assertRaises(SanourError) as ctx:
++            gateway(self.ok(model=None)).generate(profile, _call(), time.monotonic() + 5)
++        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_INVALID_RESPONSE)
++        with self.assertRaises(SanourError) as ctx:
++            gateway(self.status(429)).generate(profile, _call(), time.monotonic() + 5)
++        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_FAILED)
+ 
+ 
+-@unittest.skipUnless(_real_sdk_available(), "openai and httpx2 not installed; SDK injection tests skipped")
+-class SdkClientInjectionTests(unittest.TestCase):
+-    def setUp(self):
+-        patcher = mock.patch.dict(os.environ, {}, clear=False)
+-        patcher.start()
+-        self.addCleanup(patcher.stop)
+-        for name in op.BLOCKED_ENV_VARS:
+-            os.environ.pop(name, None)
++@SDK_REQUIRED
++class ClientValidationTests(SdkTestCase):
++    """Positive and negative cases for validate_client on real SDK clients."""
+ 
+-    def _assert_rejected(self, client, expected_fragment):
++    def _rejected(self, client, fragment):
+         with self.assertRaises(ConfigError) as ctx:
+             OpenAIProvider(SecretStr(SECRET), client=client)
+         message = str(ctx.exception)
+-        self.assertIn(expected_fragment, message)
++        self.assertIn(fragment, message)
+         self.assertNotIn(SECRET, message)
+         self.assertNotIn("attacker.example", message)
+ 
++    def _sdk(self, **overrides):
++        import httpx2
++        import openai
++
++        kwargs = dict(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
++                      http_client=httpx2.Client(transport=httpx2.MockTransport(self.ok()),
++                                                trust_env=False))
++        kwargs.update(overrides)
++        return openai.OpenAI(**kwargs)
++
++    def test_factory_client_accepted(self):
++        # The factory's real httpx2 transport passes validation with no test patch involved.
++        OpenAIProvider(SecretStr(SECRET))
++
+     def test_trusted_sdk_client_accepted(self):
+-        OpenAIProvider(SecretStr(SECRET), client=_trusted_sdk_client())
++        OpenAIProvider(SecretStr(SECRET), client=self._sdk())
+ 
+     def test_foreign_endpoint_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(base_url="https://attacker.example/v1"),
+-                              "endpoint is not the pinned endpoint")
++        self._rejected(self._sdk(base_url="https://attacker.example/v1"),
++                       "endpoint is not the pinned endpoint")
+ 
+     def test_other_api_key_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(api_key="sk-OTHER-SCRATCH-000"),
+-                              "api key does not match")
++        self._rejected(self._sdk(api_key="sk-OTHER-SCRATCH-000"), "api key does not match")
+ 
+     def test_authorization_default_header_rejected(self):
+-        self._assert_rejected(
+-            _trusted_sdk_client(default_headers={"Authorization": "Bearer sk-ATTACKER-000"}),
+-            "authorization header override is set")
+-
+-    def test_organization_or_project_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(organization="org-evil"),
+-                              "organization or project is set")
++        self._rejected(self._sdk(default_headers={"Authorization": "Bearer sk-ATTACKER-000"}),
++                       "authorization header override is set")
++
++    def test_organization_or_project_set_rejected(self):
++        self._rejected(self._sdk(organization="org-evil"), "organization or project is set")
++
++    def test_organization_header_override_rejected(self):
++        self._rejected(self._sdk(default_headers={"OpenAI-Organization": "org-x"}),
++                       "organization or project header is set")
++
++    def test_project_header_override_rejected(self):
++        self._rejected(self._sdk(default_headers={"OpenAI-Project": "proj-x"}),
++                       "organization or project header is set")
+ 
+     def test_custom_default_header_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(default_headers={"X-Probe": "1"}),
+-                              "custom header is set")
++        self._rejected(self._sdk(default_headers={"X-Probe": "1"}), "custom header is set")
++
++    def test_x_stainless_probe_rejected(self):
++        self._rejected(self._sdk(default_headers={"X-Stainless-Probe": "1"}), "custom header is set")
+ 
+-    def test_custom_header_on_client_rejected(self):
+-        client = _trusted_sdk_client()
++    def test_host_header_override_rejected(self):
++        self._rejected(self._sdk(default_headers={"Host": "attacker.example"}), "custom header is set")
++
++    def test_custom_header_collection_rejected(self):
++        client = self._sdk()
+         client._custom_headers = {"X-Probe": "1"}
+-        self._assert_rejected(client, "custom header is set")
++        self._rejected(client, "custom header is set")
+ 
+     def test_custom_query_rejected(self):
+-        client = _trusted_sdk_client()
++        client = self._sdk()
+         with mock.patch.object(type(client), "default_query", new_callable=mock.PropertyMock,
+                                return_value={"api-version": "2024-01-01"}):
+-            self._assert_rejected(client, "custom query parameters are set")
+-
+-    def test_organization_header_override_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(default_headers={"OpenAI-Organization": "org-x"}),
+-                              "organization or project header is set")
+-
+-    def test_project_header_override_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(default_headers={"OpenAI-Project": "proj-x"}),
+-                              "organization or project header is set")
+-
+-    def test_host_header_override_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(default_headers={"Host": "attacker.example"}),
+-                              "custom header is set")
++            self._rejected(client, "custom query parameters are set")
+ 
+     def test_auth_headers_mismatch_rejected(self):
+-        client = _trusted_sdk_client()
++        client = self._sdk()
+         with mock.patch.object(type(client), "auth_headers", new_callable=mock.PropertyMock,
+                                return_value={"Authorization": "Bearer sk-OTHER-SCRATCH-000"}):
+-            self._assert_rejected(client, "authorization does not come from the adapter key")
++            self._rejected(client, "authorization does not come from the adapter key")
+ 
+-    def test_sdk_default_header_names_accepted(self):
+-        OpenAIProvider(SecretStr(SECRET), client=_trusted_sdk_client(
+-            default_headers={"User-Agent": "sanour-test", "X-Stainless-Probe": "1"}))
++    def test_sdk_default_headers_accepted(self):
++        OpenAIProvider(SecretStr(SECRET), client=self._sdk(
++            default_headers={"User-Agent": "sanour-test", "X-Stainless-Lang": "python"}))
+ 
+     def test_retries_enabled_rejected(self):
+-        self._assert_rejected(_trusted_sdk_client(max_retries=2), "retries are not disabled")
++        self._rejected(self._sdk(max_retries=2), "retries are not disabled")
+ 
+     def test_env_transport_client_rejected(self):
+         import httpx2
+@@ -599,35 +484,190 @@
+ 
+         client = openai.OpenAI(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
+                                http_client=httpx2.Client(trust_env=True))
+-        self._assert_rejected(client, "environment proxy or TLS settings are enabled")
++        self._rejected(client, "environment proxy or TLS settings are enabled")
+ 
++    def test_explicit_proxy_on_client_rejected(self):
++        import httpx2
++        import openai
+ 
+-@unittest.skipUnless(_real_sdk_available(), "openai and httpx2 not installed; proxy tests skipped")
+-class ProxyAndTlsEnvironmentTests(unittest.TestCase):
++        http = httpx2.Client(trust_env=False, proxy="http://proxy.attacker.example:8080")
++        client = openai.OpenAI(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
++                               http_client=http)
++        self._rejected(client, "explicit proxy or per-host transport is configured")
++
++    def test_explicit_proxy_on_transport_rejected(self):
++        import httpx2
++        import openai
++
++        transport = httpx2.HTTPTransport(proxy="http://proxy.attacker.example:8080")
++        client = openai.OpenAI(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
++                               http_client=httpx2.Client(transport=transport, trust_env=False))
++        self._rejected(client, "transport uses an explicit proxy")
++
++    def test_tls_verification_disabled_rejected(self):
++        import httpx2
++        import openai
++
++        transport = httpx2.HTTPTransport(verify=False)
++        client = openai.OpenAI(api_key=SECRET, base_url=op.PINNED_BASE_URL, max_retries=0,
++                               http_client=httpx2.Client(transport=transport, trust_env=False))
++        self._rejected(client, "TLS verification is disabled")
++
++    def test_unknown_transport_type_rejected_under_production_policy(self):
++        import httpx2
++
++        with mock.patch.object(op, "_trusted_transport_types",
++                               return_value=(httpx2.HTTPTransport,)):
++            self._rejected(self._sdk(), "transport type is not trusted")
++
++
++@SDK_REQUIRED
++class RevalidationTests(SdkTestCase):
++    """Changes after construction are caught before every request."""
++
++    def _assert_refused(self, provider):
++        before = len(getattr(self, "requests", []))
++        with self.assertRaises(ProviderError) as ctx:
++            provider.generate(_call())
++        self.assertFalse(ctx.exception.retryable)
++        self.assertEqual(str(ctx.exception), "client configuration changed; request refused")
++        self.assertEqual(len(getattr(self, "requests", [])), before, "no request may be sent")
++
++    def test_custom_header_added_after_construction_refused(self):
++        provider, client = self.provider(self.ok())
++        provider.generate(_call())
++        client._custom_headers = {"X-Probe": "1"}
++        self._assert_refused(provider)
++
++    def test_api_key_changed_after_construction_refused(self):
++        provider, client = self.provider(self.ok())
++        client.api_key = "sk-SWAPPED-SCRATCH-000"
++        self._assert_refused(provider)
++
++    def test_trust_env_enabled_after_construction_refused(self):
++        provider, client = self.provider(self.ok())
++        client._client._trust_env = True
++        self._assert_refused(provider)
++
++    def test_transport_swapped_after_construction_refused(self):
++        import httpx2
++
++        provider, client = self.provider(self.ok())
++        client._client._transport = httpx2.HTTPTransport(verify=False)
++        self._assert_refused(provider)
++
++    def test_proxy_mount_added_after_construction_refused(self):
++        import httpx2
++
++        provider, client = self.provider(self.ok())
++        client._client._mounts = {"all://": httpx2.HTTPTransport(proxy="http://proxy.example:8080")}
++        self._assert_refused(provider)
++
++
++@SDK_REQUIRED
++class SdkSecurityTests(SdkTestCase):
++    def test_factory_client_pins_endpoint_without_org_or_project(self):
++        client = op._build_default_client(SecretStr(SECRET))
++        self.assertEqual(str(client.base_url).rstrip("/"), op.PINNED_BASE_URL)
++        self.assertIsNone(client.organization)
++        self.assertIsNone(client.project)
++        self.assertEqual(client.max_retries, 0)
++
++    def test_admin_key_env_does_not_replace_authorization(self):
++        os.environ["OPENAI_ADMIN_KEY"] = "sk-ADMIN-SCRATCH-000"
++        provider, _ = self.provider(self.ok())
++        provider.generate(_call())
++        self.assertEqual(self.requests[0].headers["authorization"], "Bearer " + SECRET)
++
++    def test_webhook_secret_does_not_change_authorization(self):
++        os.environ["OPENAI_WEBHOOK_SECRET"] = "whsec-SCRATCH-000"
++        client = op._build_default_client(SecretStr(SECRET))
++        self.assertEqual(client.auth_headers, {"Authorization": "Bearer " + SECRET})
++
++    def test_api_type_and_version_do_not_change_client_class_or_endpoint(self):
++        import openai
++
++        os.environ["OPENAI_API_TYPE"] = "azure"
++        os.environ["OPENAI_API_VERSION"] = "2024-01-01"
++        client = op._build_default_client(SecretStr(SECRET))
++        self.assertIs(type(client), openai.OpenAI)
++        self.assertEqual(str(client.base_url).rstrip("/"), op.PINNED_BASE_URL)
++
++    def test_success_path_logs_contain_no_key_at_debug_level(self):
++        provider, _ = self.provider(self.ok())
++        records = _capture_openai_logs(lambda: provider.generate(_call()))
++        self.assertGreater(len(records), 0, "debug logging produced no records; test is vacuous")
++        self.assertFalse(any(SECRET in r for r in records))
++
++    def test_error_path_logs_contain_no_key_at_debug_level(self):
++        import httpx2
++
++        handler = lambda req: httpx2.Response(  # noqa: E731
++            401, json={"error": {"message": "bad key " + SECRET, "type": "x", "code": None}})
++        provider, _ = self.provider(handler)
++        records = _capture_openai_logs(lambda: self._expect_error(provider))
++        self.assertGreater(len(records), 0, "debug logging produced no records; test is vacuous")
++        self.assertFalse(any(SECRET in r for r in records))
++
++    def _expect_error(self, provider):
++        with self.assertRaises(ProviderError):
++            provider.generate(_call())
++
++    def test_subprocess_openai_log_debug_leaks_no_key(self):
++        env = {k: v for k, v in os.environ.items() if k not in op.BLOCKED_ENV_VARS}
++        env["OPENAI_LOG"] = "debug"
++        env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
++        script = (
++            "import httpx2, openai, time\n"
++            "from pydantic import SecretStr\n"
++            "import sanour_ai.providers.openai_provider as op\n"
++            "from sanour_ai.models.base import ModelCall, ProviderError\n"
++            f"KEY = {SECRET!r}\n"
++            "op._trusted_transport_types = lambda: (httpx2.HTTPTransport, httpx2.MockTransport)\n"
++            "def h(req):\n"
++            "    return httpx2.Response(401, json={'error': {'message': 'bad ' + KEY,"
++            " 'type': 'x', 'code': None}})\n"
++            "http = httpx2.Client(transport=httpx2.MockTransport(h), trust_env=False)\n"
++            "c = openai.OpenAI(api_key=KEY, base_url=op.PINNED_BASE_URL, max_retries=0,"
++            " http_client=http)\n"
++            "p = op.OpenAIProvider(SecretStr(KEY), client=c)\n"
++            "try:\n"
++            "    p.generate(ModelCall(model_id='gpt-test', prompt='x', max_output_tokens=8,\n"
++            "                          deadline=time.monotonic() + 10))\n"
++            "except ProviderError:\n"
++            "    pass\n"
++        )
++        proc = subprocess.run([sys.executable, "-c", script], env=env, capture_output=True,
++                              text=True, timeout=60)
++        self.assertEqual(proc.returncode, 0, proc.stderr[-500:])
++        self.assertNotIn(SECRET, proc.stdout + proc.stderr)
++        self.assertIn("DEBUG", proc.stderr, "OPENAI_LOG=debug produced no debug output")
++
++
++@SDK_REQUIRED
++class ProxyAndTlsEnvironmentTests(SdkTestCase):
+     """Verified against the bundled httpx2 2.13.1 transport internals (pinned version only)."""
+ 
+     PROXY = "http://proxy.attacker.example:8080"
+ 
+     def setUp(self):
+-        patcher = mock.patch.dict(os.environ, {}, clear=False)
+-        patcher.start()
+-        self.addCleanup(patcher.stop)
+-        for name in op.BLOCKED_ENV_VARS + ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+-                                            "SSL_CERT_FILE", "SSL_CERT_DIR"):
++        super().setUp()
++        for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "SSL_CERT_FILE",
++                     "SSL_CERT_DIR"):
+             os.environ.pop(name, None)
+ 
+-    def _proxy_url_for_openai(self, client):
++    def _proxy_url(self, client):
+         from httpx2 import URL
+ 
+         transport = client._client._transport_for_url(URL("https://api.openai.com/v1/responses"))
+         return getattr(getattr(transport, "_pool", None), "_proxy_url", None)
+ 
+-    def test_negative_control_default_client_does_route_via_env_proxy(self):
++    def test_negative_control_plain_client_does_route_via_env_proxy(self):
+         import httpx2
+ 
+         os.environ["HTTPS_PROXY"] = self.PROXY
+-        plain = httpx2.Client()  # default trust_env=True
+-        transport = plain._transport_for_url(httpx2.URL("https://api.openai.com/v1/responses"))
++        transport = httpx2.Client()._transport_for_url(
++            httpx2.URL("https://api.openai.com/v1/responses"))
+         self.assertIsNotNone(getattr(getattr(transport, "_pool", None), "_proxy_url", None),
+                              "control failed: the probe cannot see env proxy routing")
+ 
+@@ -635,67 +675,25 @@
+         os.environ["HTTPS_PROXY"] = self.PROXY
+         os.environ["ALL_PROXY"] = self.PROXY
+         client = op._build_default_client(SecretStr(SECRET))
+-        self.assertIsNone(self._proxy_url_for_openai(client))
+-        self.assertIs(client._client.trust_env, False)
++        self.assertIsNone(self._proxy_url(client))
++        self.assertIs(client._client._trust_env, False)
++        OpenAIProvider(SecretStr(SECRET), client=client)  # still passes validation
+ 
+     def test_factory_client_ignores_missing_ssl_cert_file(self):
+         os.environ["SSL_CERT_FILE"] = "/nonexistent/attacker-ca.pem"
+         os.environ["SSL_CERT_DIR"] = "/nonexistent/attacker-ca-dir"
+-        client = op._build_default_client(SecretStr(SECRET))  # would raise if trust_env were on
+-        self.assertEqual(str(client.base_url).rstrip("/"), op.PINNED_BASE_URL)
+-
+-
+-@unittest.skipUnless(_real_sdk_available(), "openai and httpx2 not installed; SDK env audit skipped")
+-class SdkEnvironmentAuditTests(unittest.TestCase):
+-    """Variables not blocked: each is checked for effect on routing, auth, or headers."""
+-
+-    def setUp(self):
+-        patcher = mock.patch.dict(os.environ, {}, clear=False)
+-        patcher.start()
+-        self.addCleanup(patcher.stop)
+-        for name in op.BLOCKED_ENV_VARS:
+-            os.environ.pop(name, None)
+-
+-    def test_api_type_and_version_do_not_change_client_class_or_endpoint(self):
+-        import openai
+-
+-        os.environ["OPENAI_API_TYPE"] = "azure"
+-        os.environ["OPENAI_API_VERSION"] = "2024-01-01"
+         client = op._build_default_client(SecretStr(SECRET))
+-        self.assertIs(type(client), openai.OpenAI)
+         self.assertEqual(str(client.base_url).rstrip("/"), op.PINNED_BASE_URL)
+ 
+-    def test_webhook_secret_does_not_change_authorization(self):
+-        os.environ["OPENAI_WEBHOOK_SECRET"] = "whsec-SCRATCH-000"
+-        client = op._build_default_client(SecretStr(SECRET))
+-        self.assertEqual(client.auth_headers, {"Authorization": "Bearer " + SECRET})
+-
+-    def test_admin_key_does_not_change_authorization(self):
+-        os.environ["OPENAI_ADMIN_KEY"] = "sk-ADMIN-SCRATCH-000"
+-        client = op._build_default_client(SecretStr(SECRET))
+-        self.assertEqual(client.auth_headers, {"Authorization": "Bearer " + SECRET})
+-
+-
+ 
+-def _ok_body():
+-    return {
+-        "id": "resp_1", "object": "response", "created_at": 0, "model": "gpt-test",
+-        "status": "completed",
+-        "output": [{"type": "message", "id": "m1", "role": "assistant", "status": "completed",
+-                    "content": [{"type": "output_text", "text": "hello", "annotations": []}]}],
+-        "parallel_tool_calls": False, "tool_choice": "auto", "tools": [],
+-    }
++# ---------------------------------------------------------------- helpers
+ 
+ 
+-def _json_body(req):
+-    import json
++def _raising(make_exc):
++    def handler(req):
++        raise make_exc(req)
+ 
+-    return json.loads(req.content)
+-
+-
+-def _call():
+-    return ModelCall(model_id="gpt-test", prompt="hi", max_output_tokens=64,
+-                     deadline=time.monotonic() + 10)
++    return handler
+ 
+ 
+ def _capture_openai_logs(action):
+@@ -718,5 +716,29 @@
+     return records
+ 
+ 
++class DeadlineAndRateLimitStaticTests(unittest.TestCase):
++    def test_rate_limited_error_code_attribute(self):
++        self.assertEqual(RateLimitedError("x", retryable=True).error_code, "provider_rate_limited")
++
++    def test_error_code_enum_contains_rate_limited(self):
++        self.assertIn("PROVIDER_RATE_LIMITED", ErrorCode.__members__)
++
++
++class TimeoutTypeTests(unittest.TestCase):
++    def test_default_timeout_uses_httpx2_with_capped_values(self):
++        fake_httpx2 = mock.Mock()
++        with mock.patch.dict(sys.modules, {"httpx2": fake_httpx2}):
++            op._default_timeout(0.5)
++        fake_httpx2.Timeout.assert_called_once_with(connect=0.5, read=0.5, write=0.5, pool=0.5)
++
++    @unittest.skipUnless(_sdk_available(), "httpx2 not installed; real-type check skipped")
++    def test_real_httpx2_timeout_type(self):
++        import httpx2
++
++        value = op._default_timeout(0.5)
++        self.assertIsInstance(value, httpx2.Timeout)
++        self.assertLessEqual(value.read, 0.5)
++
++
+ if __name__ == "__main__":
+     unittest.main()
