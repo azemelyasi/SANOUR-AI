@@ -2,13 +2,13 @@ import time
 import unittest
 
 from sanour_ai.config.settings import RuntimeSettings
-from sanour_ai.core.sanour_core import SanourCore, build_mock_core
+from sanour_ai.core.sanour_core import SanourCore
 from sanour_ai.errors import ErrorCode
 from sanour_ai.models.capabilities import ModelCapabilities, ModelProfile
 from sanour_ai.models.gateway import ModelGateway
 from sanour_ai.models.router import DeterministicRouter
 from sanour_ai.observability.audit import AuditLogger
-from sanour_ai.providers.mock import TEST_FAKE_SECRET, MockBehavior, MockProvider
+from tests.mock_provider import TEST_FAKE_SECRET, MockBehavior, MockProvider, build_mock_core
 from tests.support import TOLERANCE_SECONDS, GatedProvider, wait_until
 
 

@@ -264,7 +264,8 @@ class ModelGateway:
             raise
 
         try:
-            finished_in_time = finished.wait(remaining)
+            # Recompute from the clock: time spent starting the worker must not extend the wait.
+            finished_in_time = finished.wait(max(0.0, deadline - time.monotonic()))
         except BaseException:
             self._mark_abandoned(state)
             raise
@@ -274,9 +275,15 @@ class ModelGateway:
             self._mark_abandoned(state)
             raise SanourError(ErrorCode.PROVIDER_TIMEOUT, "model call timed out", retryable=True)
 
+        # A process-control exception is re-raised first, whatever the clock says.
         fatal = outcome.get("fatal")
         if isinstance(fatal, BaseException):
             raise fatal
+
+        # wait() can report success after the deadline has passed. Such a result is discarded.
+        # The worker has already finished, so nothing is abandoned.
+        if time.monotonic() >= deadline:
+            raise SanourError(ErrorCode.PROVIDER_TIMEOUT, "model call timed out", retryable=True)
 
         if "error" in outcome:
             exc = outcome["error"]
@@ -290,6 +297,8 @@ class ModelGateway:
             not isinstance(result, ModelResult)
             or not result.text.strip()
             or len(result.text) > MAX_RESULT_CHARS
+            # The provider must answer for the model it was called with.
+            or result.model_id != call.model_id
         ):
             raise SanourError(
                 ErrorCode.PROVIDER_INVALID_RESPONSE, "model returned an invalid response"

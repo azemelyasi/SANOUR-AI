@@ -5,17 +5,14 @@ from __future__ import annotations
 import time
 import uuid
 
-from sanour_ai.config.settings import RuntimeSettings, load_settings
 from sanour_ai.core.request_manager import accept
 from sanour_ai.errors import ErrorCode, SanourError
 from sanour_ai.models.base import ModelCall
-from sanour_ai.models.capabilities import ModelCapabilities, ModelProfile
 from sanour_ai.models.gateway import ModelGateway
 from sanour_ai.models.requests import SanourRequest
 from sanour_ai.models.responses import SanourResponse
 from sanour_ai.models.router import DeterministicRouter
 from sanour_ai.observability.audit import AuditLogger
-from sanour_ai.providers.mock import MockBehavior, MockProvider
 
 INTERNAL_ERROR_MESSAGE = "internal error while processing request"
 
@@ -74,6 +71,7 @@ class SanourCore:
             model_id=profile.model_id,
             prompt=request.prompt,
             max_output_tokens=request.max_output_tokens,
+            deadline=deadline,  # the same value the gateway receives; never recomputed here
         )
         try:
             result = self._gateway.generate(profile, call, deadline)
@@ -100,35 +98,3 @@ class SanourCore:
             model_id=profile.model_id,
             latency_ms=_elapsed_ms(started),
         )
-
-
-def build_mock_core(
-    settings: RuntimeSettings | None = None,
-    behavior: MockBehavior = MockBehavior.ECHO,
-    delay_seconds: float = 0.0,
-) -> SanourCore:
-    """Composition root for tests and local runs. Uses only the mock provider.
-
-    Explicit settings win. When none are given, settings come from the validated environment
-    (load_settings), so an invalid environment value raises ConfigError here.
-    """
-    if settings is None:
-        settings = load_settings()
-    provider = MockProvider(behavior=behavior, delay_seconds=delay_seconds)
-    profile = ModelProfile(
-        alias="mock_default",
-        provider="mock",
-        model_id="mock-echo-1",
-        capabilities=ModelCapabilities(
-            text_generation=True, max_context_tokens=8192, max_output_tokens=4096
-        ),
-        runs_locally=True,
-    )
-    return SanourCore(
-        router=DeterministicRouter([profile]),
-        gateway=ModelGateway(
-            {"mock": provider},
-            max_concurrent_calls=settings.max_concurrent_provider_calls,
-        ),
-        audit=AuditLogger(),
-    )

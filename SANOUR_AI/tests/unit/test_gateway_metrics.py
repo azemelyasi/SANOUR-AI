@@ -11,7 +11,7 @@ from sanour_ai.models.base import ModelCall, ModelResult, ProviderError
 from sanour_ai.models.capabilities import ModelCapabilities, ModelProfile
 import sanour_ai.models.gateway as gwmod
 from sanour_ai.models.gateway import GatewayStats, ModelGateway
-from sanour_ai.providers.mock import MockBehavior, MockProvider
+from tests.mock_provider import MockBehavior, MockProvider
 from tests.support import GatedProvider, deadline_in, wait_until
 
 PROFILE = ModelProfile(
@@ -628,3 +628,58 @@ class PeakAccuracyTests(unittest.TestCase):
         self.assertEqual(final.peak_in_flight, 2)
         self.assertEqual((final.successful_calls, final.provider_failures), (2, 1))
         self.assertEqual((final.in_flight, final.abandoned_in_flight), (0, 0))
+
+
+class _GatedRaise:
+    """Blocks until released, then raises a BaseException (process-control style)."""
+
+    name = "mock"
+
+    def __init__(self):
+        self.gate = threading.Event()
+
+    def generate(self, call):
+        self.gate.wait()
+        raise _Fatal("late")
+
+
+class DeadlineAfterWaitTests(unittest.TestCase):
+    """wait() reports success, but the real clock has passed the deadline."""
+
+    def test_wait_true_after_deadline_is_timeout_not_success(self):
+        provider = GatedProvider()
+        self.addCleanup(provider.release_all)
+        gw = gateway(provider, max_calls=1)
+
+        def script(event, timeout):
+            time.sleep(0.12)  # real time passes the 0.05 s deadline
+            provider.release_all()  # worker finishes late
+            _RealEvent.wait(event, 5.0)  # wait until the worker has actually finished
+            return True  # wait() itself reports "finished in time"
+
+        with _patched_finished_event(script):
+            with self.assertRaises(SanourError) as ctx:
+                gw.generate(PROFILE, CALL, deadline_in(0.05))
+        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_TIMEOUT)
+        stats = gw.stats()
+        self.assertEqual((stats.successful_calls, stats.timeouts), (0, 1))
+        self.assertEqual((stats.in_flight, stats.abandoned_in_flight), (0, 0))
+        self.assertEqual(gw.timeouts, 0)  # legacy counter is wait-expiry only
+
+    def test_base_exception_after_deadline_still_propagates(self):
+        provider = _GatedRaise()
+        self.addCleanup(provider.gate.set)
+        gw = gateway(provider, max_calls=1)
+
+        def script(event, timeout):
+            time.sleep(0.12)
+            provider.gate.set()
+            _RealEvent.wait(event, 5.0)
+            return True
+
+        with _patched_finished_event(script):
+            with self.assertRaises(_Fatal):
+                gw.generate(PROFILE, CALL, deadline_in(0.05))
+        stats = gw.stats()
+        self.assertEqual((stats.unclassified_errors, stats.timeouts), (1, 0))
+        self.assertEqual((stats.in_flight, stats.abandoned_in_flight), (0, 0))

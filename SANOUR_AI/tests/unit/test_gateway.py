@@ -5,7 +5,7 @@ from sanour_ai.errors import ErrorCode, SanourError
 from sanour_ai.models.base import ModelCall, ModelResult, ProviderError
 from sanour_ai.models.capabilities import ModelCapabilities, ModelProfile
 from sanour_ai.models.gateway import MAX_RESULT_CHARS, ModelGateway
-from sanour_ai.providers.mock import MockBehavior, MockProvider
+from tests.mock_provider import MockBehavior, MockProvider
 from tests.support import TOLERANCE_SECONDS, GatedProvider, deadline_in, wait_until
 
 PROFILE = ModelProfile(
@@ -173,3 +173,33 @@ class WorkerLimitTests(unittest.TestCase):
         self.assertTrue(wait_until(lambda: gw.in_flight == 0))
         result = gw.generate(PROFILE, CALL, deadline_in(2.0))
         self.assertIn("hi", result.text)
+
+
+class _ReturnsModelId:
+    name = "mock"
+
+    def __init__(self, model_id):
+        self._model_id = model_id
+
+    def generate(self, call):
+        return ModelResult(text="answer", model_id=self._model_id)
+
+
+class ModelIdMatchTests(unittest.TestCase):
+    """The provider must echo the model id it was called with."""
+
+    def test_matching_model_id_is_success(self):
+        gw = ModelGateway({"mock": _ReturnsModelId("mock-echo-1")}, max_concurrent_calls=1)
+        result = gw.generate(PROFILE, CALL, time.monotonic() + 2.0)
+        self.assertEqual(result.text, "answer")
+        stats = gw.stats()
+        self.assertEqual((stats.successful_calls, stats.invalid_responses), (1, 0))
+
+    def test_mismatched_model_id_is_invalid_response_not_success(self):
+        gw = ModelGateway({"mock": _ReturnsModelId("some-other-model")}, max_concurrent_calls=1)
+        with self.assertRaises(SanourError) as ctx:
+            gw.generate(PROFILE, CALL, time.monotonic() + 2.0)
+        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_INVALID_RESPONSE)
+        stats = gw.stats()
+        self.assertEqual((stats.successful_calls, stats.invalid_responses), (0, 1))
+        self.assertEqual((stats.in_flight, stats.abandoned_in_flight), (0, 0))

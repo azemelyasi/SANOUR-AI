@@ -1,7 +1,7 @@
 import unittest
 
 from sanour_ai.models.base import ModelCall, ModelProvider, ProviderError
-from sanour_ai.providers.mock import TEST_FAKE_SECRET, MockBehavior, MockProvider
+from tests.mock_provider import TEST_FAKE_SECRET, MockBehavior, MockProvider
 
 CALL = ModelCall(model_id="mock-echo-1", prompt="same input", max_output_tokens=16)
 

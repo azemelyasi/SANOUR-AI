@@ -7,9 +7,8 @@ from sanour_ai.config.settings import (
     ConfigError,
     RuntimeSettings,
 )
-from sanour_ai.core.sanour_core import build_mock_core
 from sanour_ai.errors import ErrorCode
-from sanour_ai.providers.mock import MockBehavior
+from tests.mock_provider import MockBehavior, build_mock_core
 from tests.support import wait_until
 
 KEY = ENV_MAX_CONCURRENT_PROVIDER_CALLS

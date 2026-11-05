@@ -13,6 +13,7 @@ class ErrorCode(StrEnum):
     PROVIDER_FAILED = "provider_failed"
     PROVIDER_TIMEOUT = "provider_timeout"
     PROVIDER_OVERLOADED = "provider_overloaded"
+    PROVIDER_RATE_LIMITED = "provider_rate_limited"
     PROVIDER_INVALID_RESPONSE = "provider_invalid_response"
     INTERNAL_ERROR = "internal_error"
 
