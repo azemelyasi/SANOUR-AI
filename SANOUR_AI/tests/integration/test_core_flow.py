@@ -154,3 +154,34 @@ class CoreFlowTests(unittest.TestCase):
     def test_settings_drive_worker_cap(self):
         core = build_mock_core(RuntimeSettings(max_concurrent_provider_calls=3))
         self.assertEqual(core._gateway.max_concurrent_calls, 3)
+
+
+class RequiredCapabilityFlowTests(unittest.TestCase):
+    def _core(self, provider, capabilities):
+        model = ModelProfile(
+            alias="test_model",
+            provider="mock",
+            model_id="test_model-id",
+            capabilities=ModelCapabilities(
+                text_generation=True,
+                max_context_tokens=8192,
+                max_output_tokens=4096,
+                **capabilities,
+            ),
+            runs_locally=True,
+        )
+        return make_core({"mock": provider}, [model])
+
+    def test_unmet_requirement_makes_no_provider_call(self):
+        provider = MockProvider(name="mock")
+        core = self._core(provider, {"streaming": False})
+        resp = core.handle({"prompt": "hi", "required_capabilities": ["streaming"]})
+        self.assertEqual(resp.error.code, ErrorCode.NO_ELIGIBLE_MODEL)
+        self.assertEqual(provider.call_count, 0)
+
+    def test_met_requirement_calls_provider_once(self):
+        provider = MockProvider(name="mock")
+        core = self._core(provider, {"streaming": True})
+        resp = core.handle({"prompt": "hi", "required_capabilities": ["streaming"]})
+        self.assertEqual(resp.status, "success")
+        self.assertEqual(provider.call_count, 1)

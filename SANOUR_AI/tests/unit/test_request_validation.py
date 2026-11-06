@@ -81,3 +81,55 @@ class RequestValidationTests(unittest.TestCase):
 
     def test_allow_fallback_is_no_longer_accepted(self):
         self._rejected({"prompt": "x", "allow_fallback": True})
+
+
+class RequiredCapabilitiesTests(unittest.TestCase):
+    def _rejected(self, raw):
+        with self.assertRaises(SanourError) as ctx:
+            accept(raw, RID)
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+        return ctx.exception
+
+    def test_legacy_payload_defaults_to_no_requirements(self):
+        self.assertEqual(accept({"prompt": "hello"}, RID).required_capabilities, ())
+
+    def test_empty_list_means_no_requirements(self):
+        self.assertEqual(
+            accept({"prompt": "x", "required_capabilities": []}, RID).required_capabilities, ()
+        )
+
+    def test_valid_names_are_stored_as_tuple(self):
+        req = accept(
+            {"prompt": "x", "required_capabilities": ["text_generation", "streaming"]}, RID
+        )
+        self.assertEqual(req.required_capabilities, ("text_generation", "streaming"))
+
+    def test_unknown_name_rejected_without_echoing_value(self):
+        exc = self._rejected({"prompt": "x", "required_capabilities": ["sk-FAKESECRETVALUE1"]})
+        self.assertIn("required_capabilities", exc.message)
+        self.assertNotIn("sk-FAKE", exc.message)
+
+    def test_case_and_whitespace_variants_rejected(self):
+        self._rejected({"prompt": "x", "required_capabilities": ["Streaming"]})
+        self._rejected({"prompt": "x", "required_capabilities": [" streaming"]})
+
+    def test_duplicate_names_rejected(self):
+        self._rejected({"prompt": "x", "required_capabilities": ["streaming", "streaming"]})
+
+    def test_non_list_value_rejected(self):
+        self._rejected({"prompt": "x", "required_capabilities": "streaming"})
+
+    def test_capability_names_match_model_capabilities_flags(self):
+        from typing import get_args
+
+        from pydantic.fields import FieldInfo
+
+        from sanour_ai.models.capabilities import ModelCapabilities
+        from sanour_ai.models.requests import CapabilityName
+
+        flags = {
+            name
+            for name, info in ModelCapabilities.model_fields.items()
+            if isinstance(info, FieldInfo) and info.annotation is bool
+        }
+        self.assertEqual(set(get_args(CapabilityName)), flags)

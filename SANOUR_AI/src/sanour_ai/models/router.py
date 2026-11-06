@@ -29,6 +29,11 @@ def _fits(profile: ModelProfile, request: SanourRequest, needed_tokens: int) -> 
     return profile.runs_locally or not request.offline_only
 
 
+def _has_required(profile: ModelProfile, required: tuple[str, ...]) -> bool:
+    """True when the profile supports every requested capability. Empty means no requirement."""
+    return all(getattr(profile.capabilities, name) for name in required)
+
+
 class DeterministicRouter:
     def __init__(self, profiles: Iterable[ModelProfile]) -> None:
         ordered = list(profiles)
@@ -45,7 +50,9 @@ class DeterministicRouter:
         """Return the single profile this request will use."""
         needed = estimate_tokens(request.prompt) + request.max_output_tokens
         for profile in self._profiles:
-            if _fits(profile, request, needed):
+            if _fits(profile, request, needed) and _has_required(
+                profile, request.required_capabilities
+            ):
                 return profile
         raise SanourError(
             ErrorCode.NO_ELIGIBLE_MODEL, "no configured model can handle this request"

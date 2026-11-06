@@ -16,6 +16,17 @@ MAX_METADATA_VALUE_CHARS = 200
 _METADATA_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 _ALLOWED_CONTROL = frozenset({"\n", "\t", "\r"})
 
+# Exactly the boolean fields of ModelCapabilities. Guarded by a drift test.
+CapabilityName = Literal[
+    "text_generation",
+    "structured_output",
+    "tool_calling",
+    "image_input",
+    "image_output",
+    "video_output",
+    "streaming",
+]
+
 
 def _reject_control_chars(value: str, field: str) -> str:
     for ch in value:
@@ -35,6 +46,8 @@ class SanourRequestInput(BaseModel):
     timeout_seconds: float = Field(default=10.0, gt=0, le=MAX_TIMEOUT_SECONDS)
     offline_only: bool = False
     metadata: dict[str, str] = Field(default_factory=dict)
+    # Optional. Empty means legacy routing. Non-empty means the model must support ALL of them.
+    required_capabilities: tuple[CapabilityName, ...] = ()
 
     @field_validator("prompt")
     @classmethod
@@ -54,6 +67,15 @@ class SanourRequestInput(BaseModel):
             if len(val) > MAX_METADATA_VALUE_CHARS:
                 raise ValueError("metadata value too long")
             _reject_control_chars(val, "metadata value")
+        return value
+
+    @field_validator("required_capabilities")
+    @classmethod
+    def _capabilities_not_repeated(
+        cls, value: tuple[CapabilityName, ...]
+    ) -> tuple[CapabilityName, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("duplicate required capability")
         return value
 
 
