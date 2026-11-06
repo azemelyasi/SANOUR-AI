@@ -288,7 +288,10 @@ def run_tests(root, expected, label, python, logdir, extra_pythonpath=""):  # ex
     discovered = count_tests(root, python, pythonpath)
     if discovered == 0:
         fail(f"{label}: discovery found zero tests")
-    expected = discovered  # the ZIP defines the expected count; no hardcoded reference
+    if expected < 0:
+        expected = discovered  # "auto" is reserved for suites without a fixed baseline
+    elif discovered != expected:
+        fail(f"{label}: expected {expected} tests, discovered {discovered}")
     proc = subprocess.run([python, "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"],
                           cwd=root, capture_output=True, text=True, env=env)
     out = proc.stdout + proc.stderr
@@ -562,7 +565,7 @@ fi
 
 echo "== phase 3: tests (every gate is mandatory; skipped counts as failure)"
 "$PY" tools.py run-tests "$STEP_ROOT" auto step10_1 "$CLEAN_PY" "$WORK/logs"
-"$PY" tools.py run-tests "$STAGE_ROOT" auto stage6 "$CLEAN_PY" "$WORK/logs"
+"$PY" tools.py run-tests "$STAGE_ROOT" 158 stage6 "$CLEAN_PY" "$WORK/logs"
 "$CLEAN_PY" -m compileall -q "$STEP_ROOT/src" "$STEP_ROOT/tests" > logs/compileall.log 2>&1
 echo "PASS: compileall"
 fi
