@@ -1,0 +1,1290 @@
+
+SANOUR AI SAFETY, CONTROL & GOVERNANCE ARCHITECTURE
+Revision: 1.2
+Date: 2026-11-12
+Status: CONSOLIDATED PROPOSED DRAFT
+Owner Approval: NOT YET GRANTED FOR THIS DOCUMENT
+Implementation Authorization: NONE
+
+================================================================
+0. DOCUMENT IDENTITY AND AUTHORITY
+================================================================
+
+Document:
+SANOUR AI SAFETY, CONTROL & GOVERNANCE ARCHITECTURE
+
+Revision:
+1.2
+
+Purpose:
+To define the safety, control, human governance, ownership
+protection, emergency response, audit, and operational governance
+principles for the SANOUR platform.
+
+Companion document:
+SANOUR_MASTER_ARCHITECTURE_DECISIONS_r4.5.3
+
+This document must be read together with the master architecture
+decision record and all explicitly approved decisions made after
+that revision.
+
+This document does not silently replace, modify, or override the
+master architecture decision record.
+
+Status labels:
+
+APPROVED:
+A principle or decision explicitly approved by the owner.
+
+PROPOSED:
+A recommended architectural or technical direction that has not
+yet received separate explicit owner approval.
+
+UNRESOLVED:
+A question requiring a future decision.
+
+NOT AUTHORIZED:
+An action that has not received the required implementation or
+operational authorization.
+
+A decision recorded as APPROVED does not automatically authorize
+implementation, deployment, database operations, or production use.
+
+================================================================
+1. FOUNDATIONAL SAFETY PRINCIPLE
+================================================================
+
+APPROVED
+
+No AI system, Agent, autonomous process, or AI-controlled component
+may have authority to change, remove, weaken, or bypass SANOUR's
+independent control and safety mechanisms.
+
+Final governance authority must remain outside AI control.
+
+No AI component may:
+
+- Change its own foundational security policies.
+- Grant itself additional privileges.
+- Create an Agent with greater privileges without authorization.
+- Disable or bypass independent safety controls.
+- Appoint or replace the system owner.
+- Change ownership succession rules.
+- Authorize its own sensitive operations.
+- Decide to ignore a human governance restriction.
+- Remove or weaken Zero Automatic Retry.
+- Authorize its own restart after a dangerous incident.
+
+AI assistance, recommendations, planning, and execution must remain
+within explicitly authorized boundaries.
+
+An AI component cannot use its own output as authorization.
+
+================================================================
+2. AUTHORITY DOMAINS
+================================================================
+
+PROPOSED ARCHITECTURAL MODEL
+
+The following separation is proposed for SANOUR:
+
+A. AI DOMAIN
+   - Models
+   - Agents
+   - Planning and reasoning
+   - Tools and task execution
+   - User-facing AI services
+
+B. INDEPENDENT CONTROL AND SAFETY DOMAIN
+   - Safety enforcement
+   - Permission validation
+   - Privilege boundaries
+   - Sensitive-operation restrictions
+   - Emergency limitation and stop controls
+   - Safety-state monitoring
+
+C. HUMAN GOVERNANCE DOMAIN
+   - Owner authority
+   - Approved governance authorities
+   - Ownership and succession decisions
+   - Foundational policy approval
+   - Human authorization for sensitive decisions
+
+The AI Domain must not control the independent safety mechanisms
+or the final human governance authority.
+
+The exact technical boundaries, deployment topology, and
+independence mechanisms remain PROPOSED.
+
+================================================================
+3. INDEPENDENT EMERGENCY SAFETY LAYER
+================================================================
+
+APPROVED PRINCIPLES
+
+SANOUR must have independent safety controls capable of limiting
+or stopping AI access to sensitive tools, network paths, and
+operations.
+
+No AI Agent may disable, weaken, or bypass these controls.
+
+The safety architecture must support:
+
+- Independent restriction of sensitive operations.
+- Human-authorized recovery.
+- Preservation of evidence.
+- Protection against privilege escalation.
+- Proportional containment.
+- Continued operation of healthy independent services where safe.
+
+PROPOSED TECHNICAL CHARACTERISTICS
+
+The Emergency Safety Layer should be:
+
+- Independent of AI decision-making.
+- Bounded in authority.
+- Small and understandable where practical.
+- Protected against unauthorized modification.
+- Designed to avoid a single point of failure.
+
+The exact implementation, hardware, process isolation, and
+redundancy model remain unresolved.
+
+================================================================
+4. PROPORTIONAL SAFETY AND NORMAL USER ACCESS
+================================================================
+
+APPROVED
+
+Safety controls must focus on AI and high-risk operations without
+unnecessarily blocking ordinary users or healthy services.
+
+Restrictions should affect the smallest safe scope.
+
+Preferred containment order:
+
+1. Affected Agent.
+2. Affected Provider or execution path.
+3. Affected sensitive operation or module.
+4. Wider system restriction only when the risk requires it.
+
+A restriction record should identify:
+
+- Cause.
+- Affected scope.
+- Start time.
+- Remaining permitted functions.
+- Responsible authority.
+- Review conditions.
+- Conditions for lifting the restriction.
+
+The system must not claim that an unaffected service is stopped
+when it remains safely operational.
+
+================================================================
+5. FAIL SAFE, NOT FAIL OPEN
+================================================================
+
+APPROVED
+
+If independent safety controls fail:
+
+- Sensitive operations must stop or remain restricted.
+- Agents must not acquire new privileges.
+- Providers and tools must not perform new sensitive operations
+  without valid authorization.
+- Evidence must be preserved.
+- Healthy independent low-risk services may continue if safe.
+- Sensitive operations may resume only after review and
+  appropriate human authorization.
+
+Safety-control failure must never automatically grant additional
+permissions.
+
+Avoiding a single point of failure is an architectural objective.
+
+================================================================
+6. ADMINISTRATIVE CONTROL
+================================================================
+
+APPROVED PRINCIPLES
+
+An ordinary administrator cannot disable the Emergency Safety
+Layer.
+
+An administrator cannot independently:
+
+- Remove foundational safety controls.
+- Weaken Zero Automatic Retry.
+- Transfer permanent ownership.
+- Appoint a new owner.
+- Authorize an AI system to bypass its safety boundaries.
+
+Foundational safety-policy changes require owner or
+owner-designated governance approval.
+
+Highly sensitive operations should require two independent human
+approvals where feasible.
+
+Important administrative decisions must be recorded.
+
+Detailed roles, authentication methods, and permission matrices
+remain PROPOSED or UNRESOLVED until separately specified.
+
+================================================================
+7. OWNER ACCOUNT PROTECTION
+================================================================
+
+APPROVED
+
+Owner-account protection must include:
+
+- Strong multi-factor authentication.
+- Re-authentication for critical changes.
+- Independent offline recovery keys.
+- Security delays for highly sensitive changes, with an
+  opportunity to cancel.
+- Recording of requests, approvals, and outcomes.
+- Suspension of suspicious critical changes pending human review.
+
+Protection must not create unnecessary friction for ordinary
+user access.
+
+AI and Agents cannot modify owner-account protection rules.
+
+================================================================
+8. EMERGENCY OWNER RECOVERY
+================================================================
+
+APPROVED
+
+Emergency owner recovery must be independent of AI and Agents.
+
+It must include:
+
+- Secure offline recovery keys.
+- Multiple independent verification factors.
+- Verifiable evidence of the recovery request.
+- Protection against ordinary administrator or Agent takeover.
+- Traceable records of the recovery process.
+
+No critical ownership transfer may proceed until verification
+requirements are satisfied.
+
+A recovery process must not permit an AI Agent to appoint a new
+owner.
+
+================================================================
+9. EMERGENCY SUCCESSION
+================================================================
+
+APPROVED
+
+The owner may designate an emergency successor or trustee in
+advance.
+
+Emergency succession authority is limited.
+
+It does not automatically grant:
+
+- Permanent ownership.
+- Permanent owner appointment authority.
+- Authority to weaken foundational safety policies.
+- Authority to bypass Zero Automatic Retry.
+- Unlimited privilege expansion.
+
+Activation requires:
+
+1. Verification of owner unavailability under predefined
+   conditions.
+2. Independent verification of the successor's identity.
+3. Independent human approval.
+
+Termination also requires independent human approval.
+
+The owner's return does not automatically erase or transfer
+previously recorded emergency decisions.
+
+AI cannot activate, cancel, or modify emergency succession.
+
+================================================================
+10. PERMANENT OWNERSHIP TRANSFER
+================================================================
+
+APPROVED
+
+Emergency succession does not automatically become permanent
+ownership.
+
+Permanent ownership transfer requires:
+
+- A valid, pre-approved succession document.
+- Independent evidence.
+- Verification of the applicable legal requirements.
+- Review by the independent succession authority.
+
+If the required document is missing, invalid, or disputed,
+the transfer must stop.
+
+AI systems, Agents, and ordinary administrators cannot appoint
+a permanent owner.
+
+Applicable law must be followed.
+
+================================================================
+11. INDEPENDENT PERMANENT SUCCESSION AUTHORITY
+================================================================
+
+APPROVED PRINCIPLES
+
+The permanent succession authority must be independent of:
+
+- AI systems and Agents.
+- Ordinary administrators.
+- The person applying for ownership transfer.
+
+Its responsibilities include:
+
+- Reviewing succession documents.
+- Reviewing legal and identity evidence.
+- Stopping a transfer when evidence is insufficient or disputed.
+- Recording its decision and supporting evidence.
+
+Succession authority does not automatically grant permission
+to change foundational safety policies.
+
+Legal constitution, jurisdiction, and formal establishment
+remain UNRESOLVED.
+
+================================================================
+12. SUCCESSION AUTHORITY MEMBERSHIP
+================================================================
+
+APPROVED
+
+Membership structure:
+
+- Three principal members.
+- Two designated alternate members.
+
+The owner appoints the initial members.
+
+AI systems have no role in selecting, dismissing, or replacing
+members.
+
+Permanent ownership transfer requires at least two affirmative
+votes from three valid and eligible principal members.
+
+No single member can independently approve a transfer.
+
+A member with a relevant conflict of interest cannot vote on
+the affected matter.
+
+If fewer than the required valid members are available,
+the transfer must stop.
+
+Independent identity verification and authentication are
+required. Multiple accounts alone do not establish independent
+identity.
+
+Shared credentials are prohibited.
+
+Agents cannot vote.
+
+Credible collusion concerns require suspension and independent
+human review.
+
+================================================================
+13. MEMBER QUALIFICATION
+================================================================
+
+APPROVED
+
+Members must:
+
+- Have verifiable real identities.
+- Declare relevant conflicts of interest.
+- Demonstrate understanding of their legal and security duties.
+- Use independent accounts and authentication.
+- Maintain their qualifications.
+- Avoid delegating their vote to an Agent or another person.
+
+Family, friendship, or professional relationships alone neither
+qualify nor disqualify a person.
+
+Actual independence and conflicts must be assessed.
+
+================================================================
+14. RESIGNATION, REMOVAL, AND REPLACEMENT
+================================================================
+
+APPROVED
+
+Resignation must be formally recorded.
+
+Death, incapacity, or loss of qualification triggers review.
+
+Removal requires documented grounds and an independent process.
+
+No member may unilaterally remove another member.
+
+A member under review is excluded from the affected sensitive
+decision.
+
+Membership changes must be recorded while preserving previous
+records.
+
+If the number of valid members is insufficient, permanent
+ownership transfer stops.
+
+An alternate first completes the remaining term.
+
+A new independent five-year term may begin only after valid
+selection.
+
+================================================================
+15. MEMBER TERMS
+================================================================
+
+APPROVED
+
+Principal member term: Five years.
+
+One renewal is permitted after independent evaluation.
+
+Qualification and conflict-of-interest reviews occur annually.
+
+Alternates must maintain their qualifications.
+
+Expiry does not automatically create new authority.
+
+If valid membership is incomplete, a sensitive transfer cannot
+proceed.
+
+================================================================
+16. GOVERNANCE DISAGREEMENT
+================================================================
+
+APPROVED
+
+No member may independently execute a disputed permanent
+ownership transfer.
+
+The request is suspended pending resolution.
+
+The process must:
+
+- Preserve evidence.
+- Preserve objections and reasons.
+- Escalate to the appropriate higher governance authority.
+- Record decisions and responsible persons.
+
+Silence or passage of time is not approval.
+
+Unresolved disagreement means the sensitive operation does not
+proceed.
+
+Healthy independent services may continue where safe.
+
+AI cannot select the winning position or resolve the dispute
+by itself.
+
+================================================================
+17. ZERO AUTOMATIC RETRY
+================================================================
+
+APPROVED — ZR-DEF
+
+The initial authorized logical effect or request is the first
+attempt, admitted under existing admission and governance rules.
+
+A subsequent attempt is any further external write or delivery
+for the same logical effect:
+
+effect_type + logical_key
+
+System-initiated subsequent attempts are prohibited.
+
+This includes subsequent attempts initiated by:
+
+- Timers.
+- Schedulers.
+- Startup replay.
+- Lease expiry.
+- Automatic redelivery.
+- Automatic recovery.
+- Background workers.
+- Automatic resubmission.
+
+A timer or scheduler remains automatic even if an operator
+configured it.
+
+A human-triggered subsequent attempt is not automatically
+authorized.
+
+Each subsequent attempt requires its own specific, recorded,
+per-instance authorization under separate governance.
+
+The following do not authorize another attempt:
+
+- Idempotency.
+- An unchanged idempotency key.
+- Lease expiry.
+- Missing response.
+- Timeout.
+- UNKNOWN status.
+- A human's determination that an earlier operation failed,
+  without separate authorization for the next attempt.
+
+A late result from the original worker is not a new attempt.
+
+This rule applies to original external effects and Audit Sink
+delivery.
+
+No exception is implied.
+
+================================================================
+18. AUDIT EVENT IDENTITY AND DELIVERY
+================================================================
+
+APPROVED — P3-A, P3-B, P3-C
+
+Each internal Audit event has an independent durable:
+
+audit_event_id
+
+The following identities must remain distinct:
+
+- audit_event_id: identity of the internal Audit event.
+- outbox_key: delivery identity.
+- payload_digest: payload integrity reference.
+- effect identity: identity of the external logical effect.
+
+Redelivery does not create a new logical Audit event.
+
+Audit Sink delivery state is separate from the Audit event's
+logical status.
+
+Automatic Audit Sink redelivery is prohibited, including
+redelivery caused by lease expiry or startup replay.
+
+UNKNOWN delivery state remains UNKNOWN.
+
+Each subsequent Audit delivery requires a specific, recorded,
+per-event/per-attempt human authorization.
+
+The record must include:
+
+- Approver.
+- Authorization time.
+- Reason.
+- Evidence.
+- Event identity.
+- Attempt identity.
+
+Authorization is not reusable for a later attempt.
+
+Audit redelivery authorization does not authorize repetition
+of the original external effect.
+
+No modification, disabling, or operation of existing S3-2
+mechanisms is authorized by these decisions.
+
+================================================================
+19. UNKNOWN AND EVIDENCE GOVERNANCE
+================================================================
+
+APPROVED
+
+UNKNOWN must not automatically become FAILED.
+
+Evidence must be credible, traceable, and linked to the exact
+operation.
+
+Evidence assessment includes:
+
+- Operation identity.
+- Source.
+- Authenticity.
+- Integrity.
+- Time and provenance.
+
+The following alone are not proof of failure:
+
+- Timeout.
+- Lease expiry.
+- Missing provider response.
+- Missing receipt.
+- Missing local record.
+- Database unavailability.
+
+Provider acceptance is not necessarily proof of completed
+external effect.
+
+The system must distinguish:
+
+ACCEPTED
+COMPLETED
+FAILED
+UNKNOWN
+
+Final UNKNOWN determination belongs to an authorized human
+using credible evidence.
+
+The decision must record:
+
+- Approver.
+- Reason.
+- Evidence.
+- Decision time.
+
+A human decision about UNKNOWN does not itself authorize
+resubmission.
+
+Audit history must not be silently overwritten or deleted.
+Corrections and new determinations must be separate traceable
+events.
+
+================================================================
+20. R-2A: READ-ONLY STATUS AND HISTORY
+================================================================
+
+APPROVED PRINCIPLES
+
+Purpose:
+Provide internal authorized operators with a read-only view of
+operation status and history across the four target databases.
+
+The status view must not perform:
+
+- Writes.
+- State transitions.
+- Recovery.
+- Repair.
+- Lease reclaim.
+- Redelivery.
+- Resubmission.
+- Provider refresh.
+- Automatic correction.
+
+20.1 PER-FIELD SOURCE AUTHORITY
+
+For every displayed field, the system must identify:
+
+- Authoritative source.
+- Source database.
+- Last observation timestamp.
+- Completeness.
+- Availability.
+- Freshness.
+
+A stale observation must never be presented as live.
+
+An inaccessible database must be shown as unavailable.
+
+The system must not infer missing information from the remaining
+three databases.
+
+20.2 INCONSISTENT INFORMATION
+
+If sources disagree:
+
+- Show each source's information separately.
+- Mark the composite result INCONSISTENT.
+- Do not automatically select a winning source.
+- Do not select the newest timestamp as the winner merely
+  because it is newer.
+- Require separate review and evidence for adjudication.
+
+20.3 OPERATION INFORMATION
+
+Where available, the view should include:
+
+- Unique operation ID.
+- Reported status.
+- Source database for each field.
+- Last observation time.
+- Completeness.
+- Disagreement among sources.
+- Availability of each database.
+- UNKNOWN status without automatic interpretation.
+
+20.4 TRACEABLE HISTORY
+
+The view should display separately:
+
+- Initial request registration time.
+- Attempt-start time.
+- Provider response, if present.
+- Audit event registration time.
+- Last observation time.
+- Human UNKNOWN decision.
+- Decision reason and evidence.
+
+Every event must identify its source and time.
+
+No inferred event may be displayed as a confirmed event.
+
+20.5 ROLE-BASED ACCESS
+
+Approved role direction:
+
+Viewer:
+Permitted viewing information only.
+
+Auditor:
+Permitted information and audit history.
+
+Administrator:
+Permitted overall status and management reports.
+
+These roles do not acquire permission to change, retry,
+repair, redeliver, or recover operations merely by viewing them.
+
+Detailed authentication, role definitions, and permission
+matrices remain subject to separate design.
+
+20.6 ACCESS AUDIT
+
+Access to sensitive information must itself be auditable.
+
+Record:
+
+- User ID.
+- Access time.
+- Data type.
+- Operation ID where applicable.
+- Allow or deny result.
+
+Avoid placing unnecessary sensitive data in access logs.
+
+Access logging does not change the operation's status.
+
+================================================================
+21. AUDIT CONFIDENTIALITY AND INTEGRITY
+================================================================
+
+APPROVED PRINCIPLES
+
+Confidentiality:
+
+- Audit information is available only to authorized persons.
+- API keys, passwords, and authentication secrets must never
+  be stored raw in Audit records.
+- Unnecessary sensitive information must be avoided.
+- Secure identifiers and redaction should be used where needed.
+- Access to sensitive Audit information is itself auditable.
+
+Integrity:
+
+SANOUR must be able to detect potential unauthorized
+modification or deletion of Audit records.
+
+Cryptographic chaining or an equivalent integrity mechanism
+is an approved architectural direction.
+
+The exact algorithm, key management, storage arrangement,
+and verification implementation remain unresolved.
+
+Integrity checks must produce traceable results.
+
+Detection does not automatically authorize repair or deletion.
+
+================================================================
+22. AUDIT EVENT CLASSIFICATION
+================================================================
+
+APPROVED
+
+Every event type must have a defined classification:
+
+CRITICAL
+IMPORTANT
+INFORMATIONAL
+
+No event is automatically Critical merely because it is
+important to a particular module.
+
+22.1 CRITICAL EVENTS
+
+The approved Critical list is:
+
+1. Admission of financial/accounting requests.
+2. Registration of an external effect, such as payment or
+   transfer.
+3. Human decision to resolve UNKNOWN.
+4. Issuance of authorization for a subsequent attempt or
+   redelivery.
+5. Changes to roles or security permissions.
+6. Detection of tampering or integrity failure
+   (INTEGRITY_ALERT).
+
+If valid Audit Sink registration confirmation is absent for
+a Critical event, the related request must not be admitted.
+
+22.2 IMPORTANT EVENTS
+
+The approved Important list is:
+
+1. Non-critical system configuration changes.
+2. Customer or supplier contact information changes.
+3. Operational errors without financial-effect stoppage.
+4. Reporting configuration changes.
+5. User login and logout.
+6. Non-sensitive management information changes.
+7. Capacity and performance alerts.
+8. Module version or configuration changes.
+
+22.3 INFORMATIONAL EVENTS
+
+The approved Informational list is:
+
+1. Viewing general reports.
+2. Viewing statistical dashboards.
+3. Producing periodic reports.
+4. Resource usage and performance statistics.
+5. General system notifications.
+6. Non-sensitive diagnostic events.
+
+22.4 CLASSIFICATION GOVERNANCE
+
+Every event type must have a defined level.
+
+Changing a classification requires a reason and approval.
+
+If an event is tied to admission of a financial or security
+request, Critical requirements apply.
+
+Historical events must not be overwritten.
+
+Classification history must remain traceable.
+
+Overall policy changes require approval by the SANOUR
+architecture owner.
+
+A security lead may propose a change but cannot approve it
+alone.
+
+The record must include:
+
+- Reason.
+- Effective date.
+- Policy version.
+- Approving authority.
+
+Lowering a Critical classification requires special review
+and explicit owner approval.
+
+Review occurs every six months and additionally after a major
+security incident, architecture change, or newly identified risk.
+
+A review does not itself change event classifications.
+
+The review outcome must be recorded even when no change is made.
+
+================================================================
+23. AUDIT CONTINUITY AND CAPACITY
+================================================================
+
+APPROVED PRINCIPLES
+
+Required Audit events must not be silently lost.
+
+The system should use secure, bounded temporary retention
+when normal Audit registration is unavailable.
+
+If temporary capacity is full:
+
+- Do not silently delete required events.
+- Do not claim successful Audit registration.
+- Do not admit a Critical request without valid registration
+  confirmation.
+- Preserve evidence of the failure.
+- Report the condition honestly.
+
+No automatic redelivery is authorized.
+
+Unknown or unregistered events must be represented honestly.
+
+Technical details of temporary retention, capacity limits,
+and full-capacity behavior remain PROPOSED.
+
+================================================================
+24. POLICY CONFLICTS AND EMERGENCY RESPONSE
+================================================================
+
+APPROVED
+
+Policy conflicts must be:
+
+- Registered.
+- Traceable.
+- Referred to the authorized authority.
+
+No irreversible action should proceed while a material
+policy conflict remains unresolved.
+
+The decision record must include:
+
+- Reason.
+- Evidence.
+- Decision-maker.
+- Decision time.
+
+Emergency conditions do not waive:
+
+- Security requirements.
+- Accounting integrity.
+- Audit evidence preservation.
+- Zero Automatic Retry.
+
+If safe continuation is impossible, the affected operation
+must stop and be escalated to a human authority.
+
+No automatic emergency override is permitted.
+
+================================================================
+25. SAFE HALT AND SAFE RESUME
+================================================================
+
+APPROVED
+
+25.1 SAFE HALT PRIORITY
+
+1. Prevent unintended or duplicate financial effects.
+2. Preserve Audit evidence and history.
+3. Contain security risk.
+4. Preserve healthy independent services.
+5. Recover only after review, evidence, and authorization.
+
+Safe Halt must:
+
+- Stop only the affected operation or module where possible.
+- Preserve its state and evidence.
+- Avoid automatic completion or repetition.
+- Preserve healthy independent services when safe.
+
+25.2 SAFE RESUME CONDITIONS
+
+Before resumption:
+
+- The cause must be identified.
+- Credible evidence must show that the risk is resolved.
+- The affected operation state must be determined.
+- Repeat-effect risk must be addressed.
+- An authorized person must record reason, time, and approval.
+
+Resumption does not authorize repetition of an old operation.
+
+UNKNOWN remains subject to its own governance rules.
+
+25.3 RESUME AUTHORITY
+
+Financial risk:
+Finance or accounting lead.
+
+Security risk:
+Security lead.
+
+Audit or evidence risk:
+Audit lead.
+
+Cross-domain or conflicting authority:
+Architecture owner or governance authority designated by
+the owner.
+
+No authority may bypass Zero Automatic Retry.
+
+25.4 CASE RECORD
+
+Each Stop/Resume case must have an independent traceable case ID.
+
+The case record includes:
+
+- Affected operation and module IDs.
+- Reason and stop time.
+- Evidence and risk assessment.
+- Reviewer and decision-maker.
+- Resume or continued-stop decision.
+- Decision reason and time.
+- Authorization scope.
+- Links to prior Audit records.
+
+The case record does not replace original history and does
+not automatically change UNKNOWN.
+
+================================================================
+26. FOUR-DATABASE ARCHITECTURE
+================================================================
+
+APPROVED DESIGN DIRECTION
+
+The target topology consists of four physical databases:
+
+1. Evidence Ledger DB.
+2. Usage DB.
+3. Governance DB.
+4. Audit Sink DB.
+
+This is an approved design direction, not implementation
+authorization.
+
+Atomicity across the four independent database boundaries
+is not guaranteed by the current architecture.
+
+Separate transactions, even when databases share a physical
+file, do not by themselves establish a single atomic transaction
+across subsystems.
+
+Where Usage and Governance share a physical file, their
+observations are not independent.
+
+The current reviewed implementation and target topology must
+not be treated as identical.
+
+No database creation, opening, migration, schema modification,
+stamping, adoption, backup, restore, or side-effecting test
+is authorized by this document.
+
+================================================================
+27. D-03: COORDINATED FOUR-DATABASE BACKUP
+================================================================
+
+APPROVED DESIGN DIRECTION
+
+A coordinated backup set must contain:
+
+- Four independent valid database backups.
+- Start and end time recorded for each database.
+- A central Manifest linking the four backups as one set.
+
+If any required backup is incomplete or invalid, the set
+must not be described as complete or valid.
+
+The backup set must not claim that all four backups represent
+the same snapshot time.
+
+It must not claim cross-database atomicity.
+
+Restore requires a separate decision and authorization.
+
+This is a design direction only.
+
+No backup, database opening, creation, migration, or restore
+operation is authorized.
+
+================================================================
+28. D-04: READ-ONLY VERIFIER AND MIGRATION SEPARATION
+================================================================
+
+APPROVED DESIGN DIRECTION
+
+Inspection and verification must be strictly read-only.
+
+Migration must use a separate tool and a separate authorization.
+
+A read-only verifier must not:
+
+- Create databases.
+- Change schemas.
+- Stamp or adopt ownership.
+- Migrate data.
+- Repair records.
+- Modify database metadata.
+- Create side effects through inspection.
+
+Any migration requires its own explicit authorization.
+
+================================================================
+29. RESERVATION ACCOUNTING
+================================================================
+
+APPROVED PRINCIPLES
+
+Reservations must be separate from actual consumption.
+
+A reservation is not consumption.
+
+Actual usage must be based on reliable evidence.
+
+A failed or UNKNOWN reservation must not automatically be
+converted into consumption.
+
+Release of a reservation must be traceable.
+
+Automatic correction or release must not corrupt Usage records.
+
+Technical reservation lifecycle and reconciliation mechanisms
+remain subject to separate design and authorization.
+
+================================================================
+30. UNRESOLVED TECHNICAL AND GOVERNANCE ITEMS
+================================================================
+
+The following remain unresolved or require separate decisions:
+
+- Legal jurisdiction and constitution of succession authority.
+- Formal legal validity of succession documents.
+- Detailed membership selection and verification procedures.
+- Detailed owner recovery implementation.
+- Exact Emergency Safety Layer deployment architecture.
+- Safety-layer redundancy and failure independence.
+- Detailed authentication and role-permission matrix.
+- Cryptographic integrity algorithm and key management.
+- Audit retention periods and deletion policy.
+- Temporary Audit retention and capacity behavior.
+- Detailed event-registration confirmation protocol.
+- Technical implementation of the four-database topology.
+- Cross-database observation consistency.
+- Detailed reservation lifecycle.
+- Detailed implementation of Safe Halt and Safe Resume.
+- Any exception to Zero Automatic Retry.
+- Any change to existing S3-2 behavior.
+- S3-3 Claim/Send behavior beyond approved authorization
+  separation.
+- S3-4 behavior until credible evidence is available.
+
+UNRESOLVED does not mean implicitly approved.
+
+No implementation may assume a resolution.
+
+================================================================
+31. IMPLEMENTATION AND OPERATIONAL RESTRICTIONS
+================================================================
+
+NOT AUTHORIZED
+
+This document does not authorize:
+
+- Code implementation.
+- Database creation or opening.
+- Database migration.
+- Schema modification.
+- Database stamping or adoption.
+- Backup or restore.
+- Production integration.
+- Live API activation.
+- Network access or live provider calls.
+- API key use.
+- Agent privilege changes.
+- Retry or redelivery implementation.
+- Changes to existing S3-2 mechanisms.
+- Stage 4 or C4.
+- Baseline modification or promotion.
+- Any action requiring separate owner approval.
+
+G8 applies to every implementation phase, including:
+
+- Read-only code.
+- Test-only code.
+- Inspection utilities.
+- Verification tools.
+- Temporary tools.
+- Experimental code.
+
+Every implementation phase requires its own explicit owner
+authorization.
+
+Database controls G1-G7 remain in force.
+
+No authorization may be inferred from architectural approval.
+
+No approval of this document may be interpreted as permission
+to execute operations.
+
+================================================================
+32. RELATIONSHIP TO MASTER ARCHITECTURE DECISIONS
+================================================================
+
+This document is a companion governance and safety architecture.
+
+It does not replace:
+
+SANOUR_MASTER_ARCHITECTURE_DECISIONS_r4.5.3
+
+It must be reconciled with the master decision record and
+subsequent owner-approved decisions.
+
+Where this document summarizes an approved decision, the
+master decision record and explicit owner decisions remain
+the authoritative decision history.
+
+This document must not silently revise historical decisions,
+test results, hashes, implementation status, or baseline claims.
+
+Historical technical evidence and limitations remain subject
+to their original records.
+
+================================================================
+33. REVISION 1.2 CHANGE RECORD
+================================================================
+
+Changes from Revision 1.1:
+
+1. Corrected the status of the three-domain authority model:
+   PROPOSED, not separately owner-approved.
+
+2. Separated approved independence principles from proposed
+   technical characteristics of the Emergency Safety Layer.
+
+3. Expanded R-2A read-only status and history requirements.
+
+4. Clarified per-field authoritative sources and timestamps.
+
+5. Clarified stale, missing, unavailable, and inconsistent
+   source handling.
+
+6. Prohibited automatic winner selection based only on newer
+   timestamps.
+
+7. Expanded role-based viewing boundaries.
+
+8. Expanded sensitive-information access auditing.
+
+9. Clarified Audit integrity and traceable correction rules.
+
+10. Preserved approved Critical, Important, and Informational
+    event classifications.
+
+11. Preserved four-database architecture and D-03/D-04
+    design directions.
+
+12. Preserved Zero Automatic Retry and all approved P1/P2/P3
+    governance decisions.
+
+13. Clarified that this document does not grant implementation
+    or operational authorization.
+
+================================================================
+34. FINAL DECLARATION
+================================================================
+
+SANOUR must remain under independent human governance.
+
+AI systems may assist, reason, recommend, and execute only
+within explicitly authorized boundaries.
+
+No AI system, Agent, autonomous process, or ordinary
+administrator may remove or weaken the foundational safety
+and governance controls.
+
+Sensitive operations require valid authorization.
+
+Unknown outcomes must not be converted into assumed failures.
+
+Audit evidence must be preserved.
+
+Automatic subsequent external attempts are prohibited.
+
+Emergency response must prioritize safety, evidence, and
+controlled recovery.
+
+The approved architecture direction is not implementation
+authorization.
+
+All implementation, database, production, and operational
+actions remain subject to separate explicit authorization.
+
+END OF DOCUMENT
+SANOUR AI SAFETY, CONTROL & GOVERNANCE ARCHITECTURE
+Revision 1.2

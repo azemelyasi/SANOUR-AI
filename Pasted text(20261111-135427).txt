@@ -1,0 +1,366 @@
+# SANOUR\_MASTER\_ARCHITECTURE\_DECISIONS\_r4.3
+**Status: PROPOSED DRAFT. NOT OWNER-APPROVED (except D-02 within its design-direction scope).**
+**Implementation authorization: NONE.** G8 applies to every implementation phase.
+
+Documentation revision only. No file was created or modified, and no source was inspected in this revision.
+## 1\. Document identity and revision history
+
+| Field | Value |
+| ---| --- |
+| Document | SANOUR\_MASTER\_ARCHITECTURE\_DECISIONS\_r4.3 |
+| Predecessor | r4.2 |
+| Revision scope | Clarifies the atomicity wording in Section 6 only. No other content changed. |
+| Stage 3 archive identity | CONFIRMED MATCH, SHA-256 `b5a30674eaf774a5a04677ab8c638001c5b68c7fd508176166f0cdb296aa540f` (unchanged from r4.1) |
+| Historical typo | The 61-character expected value is preserved as a transcription error (section 13) |
+
+## 2\. Executive architecture principles (PROPOSED)
+1. An initial request is authorized by the request itself, under the existing admission and governance rules. A subsequent attempt for the same logical effect is a separate question.
+2. Nothing starts, restarts, or disguises an external effect without a specific, recorded, per-instance authorization for that subsequent attempt. None is currently granted.
+3. UNKNOWN is a stable state. It is not failure and not permission to resend.
+4. Missing receipts, timeouts, expired leases, and unavailable databases are not proof of failure.
+5. Reads (R-2A), same-key resubmission (R-2B), audit redelivery (R-1), repair (R-3), and reservation accounting are separate permissions. Permission in one never implies permission in another.
+6. Cross-database eventual consistency is a design direction, not proof of convergence. Disagreements are shown with provenance, never silently repaired.
+7. Conservative default: refuse, display, hold. Stuck effects are an accepted cost until the owner decides otherwise.
+## 3\. Owner-approved decisions
+
+| ID | Scope | Status |
+| ---| ---| --- |
+| D-02 | Four independent physical databases as target topology (Evidence Ledger, Usage, Governance, Audit Sink); logical effect identity `effect_type + logical_key`; per-effect attempt-marker direction; UNKNOWN principles; eventual consistency; Zero Automatic Retry as a design constraint | OWNER-APPROVED, DESIGN DIRECTION ONLY |
+
+**D-02 does NOT approve:** an operational state machine, retry or redelivery implementation, manual resubmission, recovery, repair, database operations, production integration, Stage 4/C4, or Baseline 10.7 changes.
+
+**Other prior owner decisions:** not included in the supplied record and not reproduced here. Nothing in this document adds to or replaces them.
+## 4\. Proposed decisions awaiting approval
+
+| Package | Contents | Status |
+| ---| ---| --- |
+| P1 Definitions | ZR-DEF; Audit Sink scope (X1 recommended, X2 alternative); attempt-start boundary; audit event identity | PROPOSED / UNRESOLVED |
+| P2 UNKNOWN and lifecycle | UNKNOWN exit evidence; UNKNOWN exit authority; lease expiry and reclaim (P2-C1); startup replay (P2-C2) | UNRESOLVED |
+| P3 Access and resubmission | R-2A (Q-A, C-1); R-2B (Option A) | PROPOSED |
+| P4 Audit and admission | Admission-critical event list (P4-A1); confirmation definition (P4-A2); background redelivery option (P4-B) | UNRESOLVED |
+| P5 Repair, recovery, reservations | R-3 repair boundary (PROPOSED); Reservation Accounting (UNRESOLVED) | PROPOSED / UNRESOLVED |
+| P6 Storage and backup | D-03 coordinated backup; D-04 verifier separation | UNRESOLVED / PROPOSED |
+
+Approval of one package does not approve another. Nothing in P1 to P6 is approved.
+## 5\. Stage 3 source findings
+**Evidence basis:** Stage 3 static reading performed in a sampled scope (not exhaustive). Findings are reported by the Stage 3 review. They have not been independently re-verified by the author of this document, and the sampled scope limits what they establish. Production reachability is noted per item.
+
+| \# | Finding | Label | Reachability |
+| ---| ---| ---| --- |
+| S3-0 | Archive identity: SHA-256 of the downloaded and inspected archive `SANOUR_AI_10.54-C3.3-stage3-workingcopy-r1 (1).zip` is `b5a30674eaf774a5a04677ab8c638001c5b68c7fd508176166f0cdb296aa540f` | CONFIRMED MATCH (user PowerShell result and Claude inspected-archive report, both reported; the 64-character value was also computed for the attached file in the review sandbox) | n/a |
+| S3-1 | Usage and Governance share a physical file: `Runtime.build` passes `usage_ledger_path` to `_open_production_governance` (`composition/runtime.py`, lines 145 to 148; comment at 81 to 82) | SOURCE-REPORTED CONFLICT with D-02 target topology | Production `Runtime.build` path (reported as reached) |
+| S3-2 | Audit outbox re-sends events in `unknown` status after lease expiry, relying on sink de-duplication (`governance/admission.py`, `deliver_outbox`, near line 468; `_claim`) | SOURCE-REPORTED; CONFLICT if Audit Sink is in Zero Automatic Retry scope (see P1-B) | Reached via `sweep()` and admission (line 459) |
+| S3-3 | Expired leases are reclaimed (`admission.py`, `_claim`, SQL on `audit_outbox`) | SOURCE-REPORTED; matches [GOVERNANCE.md:76](http://GOVERNANCE.md:76) | Via S3-2 |
+| S3-4 | `sweep()` applies stored intents and runs `deliver_outbox()` (`admission.py`, near lines 575 to 590) | SOURCE-REPORTED for logic; startup caller UNKNOWN | Startup caller not traced |
+| S3-5 | Provider shared send path makes one attempt (`providers/contract.py`, lines 121 to 137) | SOURCE-REPORTED | Production provider path |
+| S3-6 | OpenAI client sets `max_retries=0` (`providers/openai_provider.py`, lines 163 and 217) | SOURCE-REPORTED | Production provider path |
+| S3-7 | Retry behavior of other provider SDKs (Anthropic, Gemini, Grok, xAI) | UNVERIFIED | Not checked |
+| S3-8 | Direct `Ledger` construction in backup verification (`backup/archive.py`, line 165) and recovery (`persistence/recovery.py`, line 379). Whether construction migrates is unknown. | Construction SOURCE-REPORTED; migration behavior UNVERIFIED | Caller reachability UNVERIFIED |
+| S3-9 | First-open lock uses `fcntl.flock` (`persistence/first_open_lock.py`, lines 40 to 42, 82, 108); refuses without `fcntl`; no Windows branch; network filesystems not claimed | SOURCE-REPORTED | Platform limitation |
+| S3-10 | Four-database coordinated backup not found (`storage/owner_backup.py`, `create_owner_backup`, line 184, takes one path and one subsystem) | NOT FOUND IN INSPECTED SCOPE (not proof of absence) | n/a |
+| S3-11 | Governance text at :10, :76, :77, :83 matches the reported wording (`docs/GOVERNANCE.md`) | SOURCE-REPORTED (text); conflicts preserved | Documentation |
+| S3-12 | Sink de-duplicates by `outbox_key` and payload digest (`governance/sink.py`, `deliver`, line 86 onward) | SOURCE-REPORTED | Via S3-2 |
+
+**Not verified or unknown:** production wiring of the Audit Sink path; retry settings for non-OpenAI SDKs; whether workers hold capacity until exit; restore implementation; full Usage append-only enforcement; callers of `Runtime.build` outside `composition/`.
+
+**Sampling limitation:** 208 Python files and 42 docs exist in the archive. The Stage 3 review sampled the areas above. Absence in the sample is NOT FOUND IN INSPECTED SCOPE, not global absence.
+## 6\. Four-database target versus actual implementation
+
+| Database | Target (D-02, OWNER-APPROVED DESIGN DIRECTION) | Actual (Stage 3, SOURCE-REPORTED) | Status |
+| ---| ---| ---| --- |
+| Evidence Ledger | Independent physical database | Hash-chain `Ledger` exists; production connection not traced | UNVERIFIED reachability |
+| Usage | Independent physical database | `SqliteUsageRepository` opened by production runtime; same file as Governance | SOURCE-REPORTED CONFLICT |
+| Governance | Independent physical database | `GovernanceStore` in the same file as Usage | SOURCE-REPORTED CONFLICT |
+| Audit Sink | Independent physical database | Separate SQLite connection exists; production path not traced | UNKNOWN |
+
+**Handling:** the D-02 target is recorded as the owner's architecture choice and is not reopened here. The shared-file arrangement is recorded as a conflict between source and target. Resolution is not decided in this document and requires separate owner direction and authorization.
+
+**Consequences (PROPOSED reading):** Atomicity across the four independent database boundaries is not guaranteed by the current architecture. Separate transactions, even when databases share a physical file, do not by themselves establish a single atomic transaction across subsystems. Where Usage and Governance share a physical file, their observations are not independent.
+## 7\. Zero Automatic Retry policy proposal (P1)
+**Initial request vs subsequent attempt (clarification, PROPOSED):**
+*   **An initially authorized logical effect or request** is the first attempt for an effect, admitted under the existing admission and governance rules. Zero Automatic Retry does not require a separate human authorization for each initial provider request. This document does not claim otherwise.
+*   **A subsequent attempt** is any further external write or delivery for the same logical effect (`effect_type + logical_key`). Zero Automatic Retry concerns automatic subsequent attempts.
+*   **The initial request's authorization is never authorization for a retry or resubmission.** A subsequent attempt requires its own specific, recorded, per-instance authorization, and the proposed rules below apply to it.
+*   The boundary between initial and subsequent attempts depends on the attempt-start boundary (P1-C1). Until P1-C1 is decided, the exact cut-over is UNRESOLVED.
+
+**ZR-DEF (PROPOSED, NOT OWNER-APPROVED):** an automatic retry is any new external write or delivery attempt for the same logical effect (`effect_type + logical_key`) that is a subsequent attempt and is initiated by system logic rather than a specific, recorded, per-instance human authorization.
+
+**Proposed rules:**
+*   System-triggered subsequent attempts are prohibited.
+*   Timer or scheduler execution of a subsequent attempt is automatic, even when an operator configured it.
+*   A human-triggered subsequent attempt is not automatically authorized.
+*   Manual resubmission is NOT AUTHORIZED without separate governance.
+*   UNKNOWN never becomes failure or resend permission automatically.
+*   A late result from the original worker is not a new attempt.
+*   Idempotency does not authorize another attempt.
+*   Lease expiry, startup replay, and redelivery are automatic if they start a new subsequent external attempt.
+
+**Audit Sink scope (P1-B):**
+*   **X1 (existing architectural recommendation, PROPOSED):** Zero Automatic Retry includes Audit Sink. Under X1, S3-2 is a conflict requiring owner direction.
+*   **X2 (alternative, UNRESOLVED):** Audit Sink is governed separately, with its own bounded de-duplicated redelivery policy. X2 requires explicit owner approval and a separately defined policy. It is not approved and is not the recommendation.
+*   Neither X1 nor X2 is owner-approved.
+
+**Late results vs new attempts:** a late result is recorded with provenance. If a second attempt also occurred, the conflict is shown, not resolved by choosing one.
+## 8\. UNKNOWN and external-effect governance (P1-C, P2)
+**P1-C1, attempt-start boundary for an external effect (UNRESOLVED):** the point at which an external effect counts as started, and therefore where a subsequent attempt begins. Candidates: marker written; send issued; send confirmed. No boundary is approved. No operational state machine is approved or implied. This decision does not determine P1-C2.
+
+**P1-C2, audit event logical identity (UNRESOLVED):** how an audit event is identified for the "same logical effect" test. Candidates: audit events share the parent effect's identity; audit events carry their own identity. This decision does not determine P1-C1.
+
+**P2-A, UNKNOWN exit evidence (UNRESOLVED):** default: never exits automatically until evidence is defined. Options: provider-confirmed definitive outcome; owner-attested outcome with recorded evidence.
+
+**P2-B, UNKNOWN exit authority (UNRESOLVED, separate from P2-A):** default: no one. Options: named role with recorded approval; two-person approval.
+
+**Not proof of failure:** missing receipt, timeout, expired lease, unavailable database, provider error.
+
+**P2-C1, lease expiry and lease reclaim (UNRESOLVED):** [GOVERNANCE.md:76](http://GOVERNANCE.md:76) (as reported) and S3-3 reclaim expired leases. ZR-DEF says lease expiry proves nothing. Owner must choose: keep reclaim as reported (requires ZR-DEF amendment for any reclaim that starts a subsequent attempt), or treat expiry as informational only.
+
+**P2-C2, startup replay of stored intents (UNRESOLVED, independent of P2-C1):** [GOVERNANCE.md:10](http://GOVERNANCE.md:10) (as reported) and S3-4 apply stored intents at startup. Proposed default (PROPOSED): no startup replay without explicit authorization. Owner must choose whether to keep replay as reported (requires ZR-DEF amendment for any replay that starts a subsequent attempt) or require explicit authorization.
+
+**Late original-worker results (PROPOSED):** record only; flag duplicate attempts.
+## 9\. Audit Sink and admission policy (P4)
+**P4-A1, admission-critical event list (UNRESOLVED):** which audit events must be confirmed before an admission or provider operation may proceed. [GOVERNANCE.md:77](http://GOVERNANCE.md:77) (as reported) treats required admission events (`budget.reserved`, `quota.reserved`) as blocking. S3-2 describes synchronous delivery at `admission.py` line 459. The owner must define the list. This decision does not define what counts as confirmed.
+
+**P4-A2, definition of successful confirmation (UNRESOLVED, independent of P4-A1):** what counts as confirmed delivery: Sink receipt, Governance confirmation, or both. A Sink receipt means the Sink recorded the event. A Governance confirmation means Governance recorded the fact. Neither implies the other. This decision does not define the event list.
+
+**Redelivery options (UNRESOLVED, P4-B):**
+*   A1: one attempt; refuse or hold on failure.
+*   A2: more attempts within the request deadline.
+*   B: operator-authorized per-instance redelivery.
+*   C: bounded automatic redelivery (requires ZR-DEF amendment).
+*   D: unbounded redelivery (conflicts with ZR-DEF).
+
+**Recommendation (PROPOSED):** A1 for admission-critical events. For background events, A1 or B, subject to P1-B.
+
+**Event identity:** governed by P1-C2.
+## 10\. Status query and resubmission policy (P3)
+**R-2A, read-only status query (PROPOSED, NOT OWNER-APPROVED):**
+*   Access: internal authorized operators only (Q-A).
+*   View: composite across four databases with per-field authoritative source and read timestamp. Explicitly not an atomic snapshot (C-1).
+*   Shows stale, missing, inconsistent, and unavailable states. Never infers success or failure.
+*   Prohibited on the query path: writes, state transitions, recovery, repair, lease reclaim, redelivery, resubmission, provider refresh, automatic correction.
+*   Technical enforcement is proposed only. Not claimed to exist.
+
+**R-2B, same-key resubmission (PROPOSED, NOT OWNER-APPROVED):**
+*   Option A: strict refusal for an already-started logical effect. Conservative default, not a permanent prohibition.
+*   Human operator action does not independently authorize it.
+*   The initial request's authorization does not carry over to a resubmission.
+*   Future routes stay open through R-3 and explicit governance, without implying they are allowed.
+
+**Read/write separation:** read permission does not grant permission to resend, repair, recover, reclaim, or change state.
+
+**Field ownership:** not invented. Must come from the D-02 record. UNRESOLVED.
+## 11\. Repair, recovery, and reservation accounting (P5)
+**R-3 repair and recovery (PROPOSED analysis, NOT OWNER-APPROVED):**
+*   Internal record repair must not create a new external effect.
+*   No automatic UNKNOWN reset.
+*   No startup replay without explicit authorization.
+*   Disagreements between databases are preserved with provenance. No silent adoption, migration, or reconstruction.
+*   Repair may annotate records. It may not infer success or failure.
+
+**Reservation Accounting (UNRESOLVED):**
+*   Refusal, release, and write-off paths exist in source (`governance/budget.py` and `quota.py` write functions; `admission.py` `write_off`, line 687; SOURCE-REPORTED).
+*   No automatic settlement default is proposed.
+*   [GOVERNANCE.md:77](http://GOVERNANCE.md:77) (as reported) describes release on non-confirmation. Treated as reported, not as a decision.
+## 12\. Backup, restore, and integrity policy (P6)
+**Preserved limitations (REPORTED, NOT VERIFIED, or UNRESOLVED):**
+*   Stage 2 raw live database plus WAL copy is not proven safe.
+*   The inventory uses finalized rollback-mode backups.
+*   A manifest is evidence, not proof.
+*   Backup verification may invoke a migration-capable Ledger constructor (`backup/archive.py`, line 165; construction SOURCE-REPORTED, migration behavior UNVERIFIED).
+*   Recovery constructs Ledger directly (`persistence/recovery.py`, line 379).
+*   Coordinated four-database backup: NOT FOUND IN INSPECTED SCOPE.
+
+**Shared-file conflict:** recorded in section 6 as a source-reported conflict with D-02. Not an open owner question in this document.
+
+**P6-B, D-03 coordinated four-database backup (UNRESOLVED):** decide the coordination policy.
+
+**P6-C, D-04 read-only verifier vs migration-capable opener (PROPOSED, NOT OWNER-APPROVED):** separate verifier from opener. Evidence: S3-8.
+
+**Recommendation (PROPOSED):** no backup, verification, or restore runs against live data until D-03 and D-04 are decided and Ledger construction behavior is read under separate authorization.
+## 13\. Historical conflict register
+Preserved. None resolved.
+
+| Item | Current status | Note |
+| ---| ---| --- |
+| [GOVERNANCE.md:10](http://GOVERNANCE.md:10), startup application of stored intents | Text matches report; CONFLICT with ZR-DEF startup rule | S3-4; P2-C2 |
+| [GOVERNANCE.md:76](http://GOVERNANCE.md:76), lease reclaim | Text matches report; CONFLICT with ZR-DEF lease rule | S3-3; P2-C1 |
+| [GOVERNANCE.md:77](http://GOVERNANCE.md:77), release when outcome not confirmed | Text matches report; interacts with Reservation Accounting | Section 11; P4-A2 |
+| [GOVERNANCE.md:83](http://GOVERNANCE.md:83), at-least-once delivery | Text matches report; CONFLICT with Zero Automatic Retry if Sink in scope | S3-2; P1-B |
+| Recovery redelivery under lease | REPORTED, NOT INDEPENDENTLY VERIFIED as a separate item | Covered by S3-3 and P2-C1 |
+| Deadline and UNKNOWN historical wording | REPORTED; prior wording not in the supplied record | Corrections not reproduced |
+| Stage 2 hash discrepancies | UNRESOLVED; no values in the supplied record | Preserved as recorded |
+| Stage 3 hash transcription | Historical typo. The 61-character expected value `b5a30674eaf774a5a04677ab8c638001c5b68c7fd508176f0cdb296aa540f` was a transcription error. The verified 64-character value is `b5a30674eaf774a5a04677ab8c638001c5b68c7fd508176166f0cdb296aa540f`. Status: CONFIRMED MATCH (S3-0). | Typo preserved; not treated as an unresolved archive identity |
+| Baseline 10.7 verification | UNRESOLVED; absent from prior Claude environment, not independently verified unchanged | Preserved as stated |
+
+## 14\. Decision dependency map
+*   X1 or X2 (P1-B) gates: lease reclaim, startup replay, redelivery options A2 to D, S3-2 status.
+*   P1-C1 (attempt-start boundary) gates: where a subsequent attempt begins, UNKNOWN classification, late-result classification, R-2B.
+*   P1-C2 (audit event identity) gates: any audit "same effect" test. Independent of P1-C1.
+*   P2-A and P2-B gate: R-3 repair, R-2B resolution paths. Separate from each other.
+*   P2-C1 (lease expiry and reclaim) and P2-C2 (startup replay) are independent of each other. Both depend on P1-A and P1-B.
+*   P4-A1 (event list) and P4-A2 (confirmation definition) are independent of each other. P4-A2 interacts with Reservation Accounting.
+*   Shared-file conflict (section 6) gates: R-2A composite meaning and any cross-database consistency claim. Resolution is outside this document.
+*   R-2A and R-2B are independent.
+*   Reservation Accounting gates admission refusal consequences.
+*   D-03 and D-04 gate any backup or restore policy.
+## 15\. Recommended decision sequence (PROPOSED)
+1. P1: ZR-DEF (including the initial-versus-subsequent attempt distinction), X1 or X2 (X1 recommended), P1-C1 and P1-C2 as separate decisions.
+2. P2: UNKNOWN exit evidence and authority (separate), then P2-C1 and P2-C2 (separate).
+3. P3: R-2A and R-2B, each separately.
+4. P4: P4-A1 and P4-A2 (separate), then P4-B.
+5. P5: R-3 repair boundary, then Reservation Accounting.
+6. P6: D-03 and D-04.
+7. Separate authorization for any implementation (G8).
+
+Approval of one package does not approve another. Within a package, approval of one decision does not approve its sibling.
+## 16\. Explicit implementation authorization status
+
+| Item | Status |
+| ---| --- |
+| Implementation of any kind | NOT AUTHORIZED |
+| Source inspection beyond the Stage 3 review | NOT AUTHORIZED |
+| Database operations | NOT AUTHORIZED |
+| Backup, restore, migration | NOT AUTHORIZED |
+| Tests, scripts, builds | NOT AUTHORIZED |
+| Provider calls | NOT AUTHORIZED |
+| Stage 4/C4 | NOT AUTHORIZED |
+| Baseline 10.7 change or promotion | NOT AUTHORIZED |
+| Manual resubmission | NOT AUTHORIZED |
+| ErrorCode changes | NOT AUTHORIZED |
+| G8 for every implementation phase | Applies |
+
+## 17\. Owner decision register
+Each entry is a separate approval scope. Approving one does not approve another.
+### P1: Definitions
+**P1-A. Zero Automatic Retry definition and rules (ZR-DEF)**
+*   Status: PROPOSED, NOT OWNER-APPROVED.
+*   Existing evidence: D-02 constraint; ZR-DEF text (section 7).
+*   Recommendation: approve as drafted, including the initial-versus-subsequent attempt distinction, with the scope decision in P1-B.
+*   Alternatives: amend; reject.
+*   Approval would authorize: the definition and rules as the design constraint.
+*   Approval would NOT authorize: any implementation, any retry or redelivery path, any change to audit delivery, or any authorization for a subsequent attempt.
+
+**P1-B. Audit Sink scope**
+*   Status: UNRESOLVED. Existing recommendation: **X1** (PROPOSED). Alternative: **X2** (requires owner approval and a separately defined policy).
+*   Existing evidence: S3-2, S3-12; [GOVERNANCE.md:83](http://GOVERNANCE.md:83) (as reported).
+*   Recommendation: X1, to be decided by the owner. Not owner-approved.
+*   Approval (X1) would authorize: Zero Automatic Retry applies to Audit Sink delivery as a decision.
+*   Approval (X2) would authorize: only the decision to govern Audit Sink separately. The separate policy requires its own approval.
+*   Approval would NOT authorize: redelivery code, changes to S3-2, any Sink operation, or any database change.
+
+**P1-C1. Attempt-start boundary for an external effect**
+*   Status: UNRESOLVED.
+*   Existing evidence: D-02 attempt-marker direction; no approved boundary.
+*   Recommendation: decide after P1-A. No default.
+*   Alternatives: marker written; send issued; send confirmed.
+*   Approval would authorize: the boundary as a definition.
+*   Approval would NOT authorize: any operational state machine, any change to P1-C2, or any authorization for a subsequent attempt.
+
+**P1-C2. Audit event logical identity**
+*   Status: UNRESOLVED. Independent of P1-C1.
+*   Existing evidence: D-02 identity for effects; no approved audit identity.
+*   Recommendation: decide separately. No default.
+*   Alternatives: audit events share the parent effect's identity; audit events carry their own identity.
+*   Approval would authorize: the identity rule for audit events.
+*   Approval would NOT authorize: the attempt-start boundary in P1-C1, or any audit delivery path.
+### P2: UNKNOWN and lifecycle
+**P2-A. UNKNOWN exit evidence**
+*   Status: UNRESOLVED.
+*   Existing evidence: D-02 UNKNOWN principles; ZR-DEF.
+*   Recommendation: no automatic exit until evidence is defined.
+*   Alternatives: provider-confirmed; owner-attested with recording.
+*   Approval would authorize: the evidence rule as a definition.
+*   Approval would NOT authorize: any UNKNOWN transition, or who may apply it (P2-B).
+
+**P2-B. UNKNOWN exit authority**
+*   Status: UNRESOLVED. Separate from P2-A.
+*   Recommendation: no one by default.
+*   Alternatives: named role with recorded approval; two-person approval.
+*   Approval would authorize: who may approve, as a rule.
+*   Approval would NOT authorize: any transition, or the evidence rule in P2-A.
+
+**P2-C1. Lease expiry and lease reclaim**
+*   Status: UNRESOLVED. Conflicts with [GOVERNANCE.md:76](http://GOVERNANCE.md:76) as reported, and with ZR-DEF as drafted (S3-3).
+*   Recommendation: expiry informational; any reclaim that starts a subsequent attempt requires explicit authorization.
+*   Alternatives: keep reclaim as reported (requires ZR-DEF amendment).
+*   Approval would authorize: the chosen lease rule as policy.
+*   Approval would NOT authorize: P2-C2 (startup replay), changes to existing code, or resolution of the historical conflict in governance documents.
+
+**P2-C2. Startup replay of stored intents**
+*   Status: UNRESOLVED. Conflicts with [GOVERNANCE.md:10](http://GOVERNANCE.md:10) as reported, and with ZR-DEF as drafted (S3-4). Independent of P2-C1.
+*   Recommendation: no startup replay without explicit authorization.
+*   Alternatives: keep replay as reported (requires ZR-DEF amendment).
+*   Approval would authorize: the chosen startup rule as policy.
+*   Approval would NOT authorize: P2-C1 (lease reclaim), any startup code change, or resolution of the historical conflict in governance documents.
+### P3: Access and resubmission
+**P3-A. R-2A read-only status query**
+*   Status: PROPOSED, NOT OWNER-APPROVED.
+*   Existing evidence: GPT-6 preference (Q-A, C-1). No status query path has been source-verified.
+*   Recommendation: Q-A and C-1 with the prohibitions in section 10.
+*   Alternatives: caller-scoped access; single-database answers.
+*   Approval would authorize: the read-only policy.
+*   Approval would NOT authorize: any query implementation, provider refresh, or field ownership.
+
+**P3-B. R-2B same-key resubmission**
+*   Status: PROPOSED, NOT OWNER-APPROVED.
+*   Existing evidence: ZR-DEF; S3-5 and S3-6 (single-attempt provider calls, SOURCE-REPORTED).
+*   Recommendation: Option A, strict refusal, as default and not permanent.
+*   Alternatives: resubmission after verified terminal failure; operator-authorized after review; new logical identity (conflicts with the identity rule).
+*   Approval would authorize: refusal as the default policy.
+*   Approval would NOT authorize: any resend, refusal implementation, ErrorCode change, or reuse of the initial request's authorization.
+### P4: Audit and admission
+**P4-A1. Admission-critical event list**
+*   Status: UNRESOLVED. Independent of P4-A2.
+*   Existing evidence: [GOVERNANCE.md:77](http://GOVERNANCE.md:77) (as reported); S3-2 synchronous delivery.
+*   Recommendation: define an explicit list.
+*   Alternatives: any listed scope.
+*   Approval would authorize: the listed events as admission-critical.
+*   Approval would NOT authorize: the definition of confirmation (P4-A2), changes to admission code, or reservation settlement.
+
+**P4-A2. Definition of successful confirmation**
+*   Status: UNRESOLVED. Independent of P4-A1.
+*   Existing evidence: Sink receipt and Governance confirmation are different evidence (S3-12; [GOVERNANCE.md:77](http://GOVERNANCE.md:77) as reported).
+*   Recommendation: define confirmation as receipt, Governance confirmation, or both.
+*   Alternatives: receipt only; Governance confirmation only; both.
+*   Approval would authorize: the confirmation definition.
+*   Approval would NOT authorize: the event list (P4-A1), changes to admission code, or reservation settlement.
+
+**P4-B. Background redelivery option**
+*   Status: UNRESOLVED. Depends on P1-B.
+*   Recommendation: A1 pending P1-B.
+*   Alternatives: B; C (requires ZR-DEF amendment); D (conflicts with ZR-DEF).
+*   Approval would authorize: the chosen option as policy.
+*   Approval would NOT authorize: any redelivery path, including existing S3-2 logic.
+### P5: Repair, recovery, reservations
+**P5-A. R-3 repair and recovery boundary**
+*   Status: PROPOSED, NOT OWNER-APPROVED.
+*   Recommendation: internal annotation only; no new external effect; no automatic UNKNOWN reset; no startup replay without authorization.
+*   Alternatives: owner-gated repair actions with recorded authority.
+*   Approval would authorize: the boundary as policy.
+*   Approval would NOT authorize: any repair code, database operation, or UNKNOWN transition.
+
+**P5-B. Reservation Accounting**
+*   Status: UNRESOLVED.
+*   Existing evidence: budget and quota write paths; `admission.py` `write_off` (line 687); SOURCE-REPORTED.
+*   Recommendation: no default. Decide separately.
+*   Approval would authorize: accounting rules once defined.
+*   Approval would NOT authorize: settlement changes or write-offs.
+### P6: Storage and backup
+**P6-B. D-03 coordinated four-database backup**
+*   Status: UNRESOLVED.
+*   Recommendation: decide the coordination policy.
+*   Approval would authorize: the backup policy direction.
+*   Approval would NOT authorize: any backup run.
+
+**P6-C. D-04 read-only verifier vs migration-capable opener**
+*   Status: PROPOSED, NOT OWNER-APPROVED.
+*   Existing evidence: S3-8 (construction SOURCE-REPORTED; migration behavior UNVERIFIED).
+*   Recommendation: separate verifier from opener.
+*   Approval would authorize: the separation as policy.
+*   Approval would NOT authorize: changes to verification code, or any verification run.
+
+* * *
+**Stopping here. This document is PROPOSED, NOT OWNER-APPROVED, except D-02 within its design-direction scope. No implementation, source inspection, database operation, test, backup, restore, migration, provider call, Stage 4/C4, or Baseline 10.7 change is authorized or was performed.**
+
+* * *
+**Change note (r4.2 to r4.3, corrected):** The document identity was updated to SANOUR\_MASTER\_ARCHITECTURE\_DECISIONS\_r4.3, with predecessor r4.2 and revision scope limited to clarifying the Section 6 atomicity wording. The Section 6 wording was clarified: the "Consequences" sentence now states that atomicity across the four independent database boundaries is not guaranteed by the current architecture, that separate transactions do not by themselves establish a single atomic transaction, and that shared-file observations are not independent. No other section, decision, status, recommendation, conflict, or hash value was changed.

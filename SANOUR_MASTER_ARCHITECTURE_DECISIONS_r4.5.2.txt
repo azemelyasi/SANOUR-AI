@@ -1,0 +1,844 @@
+
+SANOUR MASTER ARCHITECTURE DECISIONS
+Revision r4.5.2
+DOCUMENTATION CLARIFICATION REVISION
+
+Document Status: PROPOSED DOCUMENTATION REVISION
+Base Revision: r4.5.1
+Previous Revision: r4.5
+Proposed Revision: r4.5.2
+Date: 2026-11-11
+
+OWNER APPROVAL STATUS:
+- P1, P2 and P3 decisions were explicitly approved by the project owner in the ChatGPT conversation.
+- This revision records and clarifies those previously approved decisions.
+- This document does not create new architectural approvals.
+- Approval of an architectural decision does not constitute implementation authorization.
+
+IMPLEMENTATION AUTHORIZATION: NONE
+
+
+============================================================
+1. PURPOSE OF THIS REVISION
+============================================================
+
+The purpose of r4.5.2 is to improve documentation accuracy,
+historical traceability, and governance clarity.
+
+This revision is limited to documentation clarification.
+
+It does not reopen, reverse, or modify previously approved
+P1, P2, or P3 decisions.
+
+This revision clarifies:
+
+1. The approval status and provenance of P1, P2, and P3.
+2. The distinction between current and historical decision IDs.
+3. The distinction between approved decisions and unresolved
+   technical mechanisms.
+4. The distinction between architectural approval and
+   implementation authorization.
+5. The status of known S3-2 and S3-3 conflicts.
+6. The unresolved status of S3-4 where original evidence is
+   insufficient.
+7. The distinction between the approved four-database target
+   architecture and current implementation status.
+8. The independent authorization required for every
+   implementation phase and database operation.
+
+
+============================================================
+2. APPROVED P1 DECISIONS
+============================================================
+
+P1-A — ZERO AUTOMATIC RETRY DEFINITION
+
+Status: OWNER APPROVED
+
+The initial logical request, when admitted under existing
+Admission and Governance rules, constitutes the first attempt.
+
+A subsequent attempt means any additional external write or
+delivery for the same logical effect, identified by:
+
+    effect_type + logical_key
+
+The following rules apply:
+
+- The system must not automatically initiate a subsequent
+  attempt.
+- A Timer- or Scheduler-initiated subsequent attempt is
+  automatic, even if its schedule was configured by an
+  operator.
+- A human action alone does not authorize a subsequent attempt.
+- Manual resubmission is not authorized without separate
+  Governance authorization.
+- UNKNOWN must never automatically become FAILED or create
+  permission to resend.
+- A late result from the original worker is not a new attempt.
+- Idempotency alone does not authorize another attempt.
+- Lease expiry, startup replay, and redelivery are subject
+  to this rule whenever they initiate a new external effect.
+- Each subsequent attempt requires its own specific,
+  recorded, per-instance authorization under separate
+  Governance rules.
+
+The authorization process, authority structure, storage
+mechanism, and technical enforcement of subsequent-attempt
+authorization remain unresolved.
+
+Scope of approval:
+Architectural definition of Zero Automatic Retry.
+
+Explicitly excluded:
+- Implementation of retry or redelivery.
+- Implementation of resubmission.
+- Modification of existing delivery mechanisms.
+- Authorization of any subsequent attempt.
+- Changes to Audit Sink operation.
+
+
+P1-B — AUDIT SINK SCOPE
+
+Status: OWNER APPROVED — OPTION X1
+
+Zero Automatic Retry also applies to Audit Sink delivery.
+
+- Automatic redelivery is prohibited.
+- No Audit Sink exception is assumed.
+- Any exception, including X2, requires a separate owner
+  decision and Governance approval.
+- This decision does not authorize modifying, disabling,
+  replacing, or operating existing S3-2 mechanisms.
+
+
+P1-C1 — ATTEMPT START BOUNDARY
+
+Status: OWNER APPROVED
+
+An attempt is considered started when its Attempt Marker
+has been durably written.
+
+This is an accounting and Governance boundary only.
+
+The marker alone does not prove:
+
+- That a request was physically transmitted over the network.
+- That the Provider received the request.
+- That an external effect occurred.
+
+No operational state machine or implementation mechanism
+is approved by this definition.
+
+
+P1-C2 — AUDIT EVENT LOGICAL IDENTITY
+
+Status: OWNER APPROVED
+
+Each internal Audit event has its own independent logical
+identity.
+
+This identity is used for internal event identification.
+
+It must not be equated with:
+
+- outbox_key
+- payload_digest
+- External logical-effect identity
+
+This decision does not authorize bypassing Zero Automatic
+Retry or initiating another external effect.
+
+
+============================================================
+3. APPROVED P2 DECISIONS
+============================================================
+
+P2-C1 — LEASE EXPIRY AND RECLAIM
+
+Status: OWNER APPROVED
+
+- Lease expiry alone does not authorize Reclaim that
+  initiates a subsequent external effect.
+- UNKNOWN must be preserved.
+- Any subsequent attempt remains subject to P1-A.
+- Lease expiry is not proof of operation failure.
+
+Unresolved:
+
+Whether an internal Claim or Reclaim that does not initiate
+an external send may be permitted in a future architecture
+has not been decided.
+
+In particular, no assumption may be made that Claim-only
+operation is permitted or technically separated from Send
+in existing mechanisms.
+
+Until a separate owner decision and authorization exist,
+no Claim-only, Reclaim, or operational change is authorized.
+
+
+P2-C2 — STARTUP REPLAY
+
+Status: OWNER APPROVED
+
+- Automatic replay or resend after restart is prohibited.
+- UNKNOWN must be preserved.
+- Checking operation status does not authorize resending.
+- Startup Replay must not initiate a subsequent external
+  attempt.
+
+This decision does not authorize modifying or disabling
+existing mechanisms.
+
+
+P2-D1 — EVIDENCE CRITERIA
+
+Status: OWNER APPROVED
+
+A decision about an operation's status must be based on
+credible, traceable evidence linked to that exact operation.
+
+Five approved evidence criteria:
+
+1. Operation identity.
+2. Evidence source.
+3. Evidence authenticity.
+4. Evidence integrity.
+5. Evidence time and provenance.
+
+The following are not, by themselves, proof of failure:
+
+- Timeout.
+- Lease expiry.
+- Missing response.
+- Missing record.
+- Loss of connectivity to the Provider.
+
+A Provider response indicating ACCEPTED does not necessarily
+prove completion of the external effect.
+
+The labels ACCEPTED, COMPLETED, FAILED, and UNKNOWN are
+used in this document only to distinguish reported meanings.
+
+No State Machine, Transition rules, or operational mechanism
+is approved by these labels.
+
+Unresolved:
+
+Technical and testable definitions of evidence authenticity,
+validity, sufficiency, and integrity.
+
+
+P2-D2 — UNKNOWN DECISION AUTHORITY
+
+Status: OWNER APPROVED
+
+- Final determination of UNKNOWN must be made by an
+  authorized human based on evidence.
+- A Worker or Scheduler must not determine failure based
+  on assumptions, Timeout, or Lease expiry.
+- The determination must record the approver, time, reason,
+  and evidence.
+- A human determination of operation status does not itself
+  authorize Resubmission.
+
+Unresolved:
+
+The precise roles, authority levels, and qualification
+criteria for an authorized human.
+
+
+P2-D3 — AUDIT HISTORY PRESERVATION
+
+Status: OWNER APPROVED
+
+- Decision history must not be silently overwritten or
+  deleted.
+- Corrections and new determinations must be recorded as
+  separate, traceable events.
+
+Unresolved:
+
+The storage location, relationship to the four databases,
+and technical mechanism for recording corrections.
+
+
+============================================================
+4. APPROVED P3 DECISIONS — AUDIT EVENT AND DELIVERY
+============================================================
+
+P3-A — AUDIT EVENT IDENTITY
+
+Status: OWNER APPROVED
+
+Each Audit Event must have an independent and durable
+logical identity, identified in the architectural decision
+as:
+
+    audit_event_id
+
+The following identities have distinct purposes:
+
+- audit_event_id: logical identity of the Audit Event.
+- outbox_key: delivery identity.
+- payload_digest: content-integrity reference.
+- External effect identity: identity of the external
+  logical effect.
+
+Redelivery must not create a new logical Audit Event.
+
+This decision does not authorize repeating the original
+external effect.
+
+Important:
+
+Approval of this definition does not prove that
+audit_event_id currently exists or is implemented in code.
+
+Its actual technical existence and implementation status
+remain subject to separately authorized verification.
+
+Unresolved:
+
+The exact technical relationship between audit_event_id,
+outbox_key, and payload_digest.
+
+
+P3-B — AUDIT SINK DELIVERY
+
+Status: OWNER APPROVED
+
+- Automatic redelivery is prohibited.
+- Audit Event status and delivery status are separate
+  concepts.
+- An unknown delivery status must remain UNKNOWN.
+- Lease expiry does not authorize redelivery.
+- Startup Replay does not authorize redelivery.
+- Evidence concerning the previous delivery must be
+  considered before any separate decision.
+- Every subsequent delivery requires independent
+  authorization.
+- This decision does not authorize modifying, disabling,
+  replacing, or operating existing S3-2 mechanisms.
+
+Unresolved:
+
+The names, structure, and storage location of independent
+Audit Event and Delivery status fields.
+
+
+P3-C — MANUAL REDELIVERY AUTHORITY
+
+Status: OWNER APPROVED
+
+Every subsequent Audit Sink delivery requires specific,
+recorded human authorization for that exact event and
+that exact delivery attempt.
+
+Authorization records must include:
+
+- Approver.
+- Time.
+- Reason.
+- Relevant evidence.
+
+Authorization for one attempt cannot be reused for
+subsequent attempts.
+
+Audit Sink redelivery authorization never authorizes
+repeating the original external effect.
+
+Unresolved:
+
+- Exact identifier for each delivery attempt.
+- Technical single-use authorization consumption mechanism.
+- Authorization storage and validation location.
+- Prevention of authorization reuse during concurrent
+  execution.
+
+No such mechanisms are designed or implemented by this
+revision.
+
+
+============================================================
+5. DECISION ID MAPPING AND HISTORICAL TRACEABILITY
+============================================================
+
+The current identifiers in this revision are the reference
+identifiers for the decisions recorded here.
+
+Historical identifiers are retained only for traceability.
+
+Changing an identifier does not create a new decision,
+delete an earlier decision, or constitute renewed approval.
+
+The current identifiers are:
+
+Lease Expiry / Reclaim              P2-C1
+Startup Replay                      P2-C2
+Evidence                            P2-D1
+Decision Authority                  P2-D2
+Audit History                       P2-D3
+Audit Event Identity                P3-A
+Audit Sink Delivery                 P3-B
+Manual Redelivery Authority         P3-C
+
+Historical references:
+
+- Older P2 identifiers previously used for Evidence or
+  Authority remain historical references only.
+- Older P3 identifiers associated with the R-2 package
+  must not be confused with current P3-A, P3-B, and P3-C.
+
+The current P3 identifiers refer specifically to Audit
+Event identity and Audit delivery decisions.
+
+For historical references, the topic and source revision
+must be included.
+
+If the available source material is insufficient to
+establish an exact mapping, the mapping must be recorded
+as UNMAPPED rather than inferred.
+
+The identifier mapping is for documentation and historical
+traceability only. It does not create implementation
+authorization.
+
+
+============================================================
+6. OPEN AND UNRESOLVED DECISIONS
+============================================================
+
+The following topics remain open.
+
+This revision does not approve their design or implementation.
+
+1. R-2A:
+   Read-only Query design and scope.
+
+2. R-2B:
+   Policy for an already-started logical effect.
+
+3. R-4:
+   Definition of human roles and authority levels.
+
+4. R-5:
+   Technical criteria for evidence authenticity and
+   sufficiency.
+
+5. R-6:
+   Claim-only design and its relationship with Lease
+   and Send.
+
+6. R-7:
+   Exact Attempt identifier for Audit delivery.
+
+7. R-8:
+   Storage and single-use consumption of Redelivery
+   authorization.
+
+8. R-9:
+   Independent Audit Event and Delivery status structure.
+
+9. P4-A1:
+   Admission-Critical event list.
+
+10. P4-A2:
+    Definition of the confirmation required for those
+    events.
+
+11. P6:
+    Coordinated backup design for the four databases.
+
+12. D-03:
+    Final decision on coordinated backup for the
+    four databases.
+
+13. D-04:
+    Separation of Read-only Verifier from
+    Migration-capable Opener.
+
+14. Reservation Accounting:
+    Independent architectural decision.
+
+15. UNKNOWN Exit Evidence:
+    Separation of evidence requirements from decision
+    authority.
+
+16. S3-2:
+    Automatic Redelivery conflict with Zero Automatic Retry.
+
+17. S3-3:
+    Lease, Claim, and Send relationship.
+
+18. S3-4:
+    Historical reference requiring original source
+    recovery and verification.
+
+R-4 through R-9 are identifiers for unresolved topic
+categories only.
+
+Their presence does not constitute approval of a design,
+technical solution, or implementation mechanism.
+
+No unresolved topic may be treated as approved merely
+because it is listed in this document.
+
+
+============================================================
+7. S3-2, S3-3, AND S3-4 CONFLICT REGISTER
+============================================================
+
+S3-2 — REDELIVERY AFTER LEASE EXPIRY
+
+Stage 3 findings reported a mechanism that may resend
+UNKNOWN events after Lease expiry.
+
+If this behavior initiates a subsequent external delivery,
+it is inconsistent with:
+
+- P1-A
+- P1-B
+- P2-C1
+- P2-C2
+- P3-B
+
+Status:
+
+Architectural conflict recorded.
+
+No operational action is authorized.
+
+This document does not authorize changing, disabling,
+replacing, or executing S3-2.
+
+
+S3-3 — CLAIM AND SEND
+
+Previous reviews raised the possibility that Claim and
+Send are coupled.
+
+It remains unresolved whether an internal Claim without
+an external Send can be defined or whether the current
+structure supports such separation.
+
+Status:
+
+Unresolved.
+
+No Claim-only, Reclaim, or operational change is authorized.
+
+This document does not infer that Claim-only operation
+is permitted.
+
+
+S3-4 — INSUFFICIENTLY DOCUMENTED HISTORICAL REFERENCE
+
+The original source and technical details associated with
+S3-4 are not sufficiently documented in this revision.
+
+Until the original source is recovered and reviewed:
+
+- S3-4 remains UNVERIFIED.
+- No specific technical defect is asserted.
+- No implementation conclusion may be inferred.
+- No operational action is authorized.
+
+S3-4 must not be treated as a confirmed technical finding
+without supporting source evidence.
+
+
+OWNER ACTION
+
+S3-2 and S3-3 remain recorded as requiring owner review
+and separate planning.
+
+No assumed deadline is established by this document.
+
+Any future action requires its own explicit authorization
+under the applicable Governance rules.
+
+
+============================================================
+8. FOUR-DATABASE ARCHITECTURE
+============================================================
+
+The owner-approved target architecture consists of four
+physically independent databases:
+
+1. Evidence Ledger DB
+2. Usage DB
+3. Governance DB
+4. Audit Sink DB
+
+This is an approved architectural direction.
+
+It does not establish the current physical implementation
+or authorize database creation, migration, or modification.
+
+Previously reported implementation status:
+
+- Usage and Governance shared one physical database in
+  the reviewed code.
+- Audit Sink was separate by default.
+- Evidence Ledger was not wired into the reviewed
+  production runtime.
+
+These are historical review findings and must not be
+treated as independently reverified current runtime facts.
+
+The approval of four physically independent target
+databases does not establish:
+
+- Their current physical existence.
+- Their current operational independence.
+- Their current production integration.
+- Authorization to create or migrate them.
+
+No global atomicity across the four independent database
+boundaries is guaranteed by the current architecture.
+
+Separate transactions, even when databases share a
+physical file, do not by themselves establish a single
+atomic transaction across subsystems.
+
+Where Usage and Governance share a physical file,
+their observations are not independent.
+
+No coordinated transaction or cross-database recovery
+mechanism is approved by this revision.
+
+
+============================================================
+9. TECHNICAL STATUS AND EVIDENCE LIMITATIONS
+============================================================
+
+Stage 3 findings are historical documentation evidence.
+
+The following must not be treated as verified current
+implementation facts without separately authorized review:
+
+- Existence of audit_event_id in implementation.
+- Separation of Event and Delivery status.
+- Existence of an independent Attempt ID.
+- Single-use authorization enforcement.
+- Claim without Send capability.
+- Removal or modification of Redelivery paths.
+- Actual four-database independence in Runtime.
+
+The previous static review reportedly sampled:
+
+- 208 Python files.
+- 42 documentation files.
+
+That review was not an exhaustive inspection of all files.
+
+The reported Stage 3 archive hash is retained as a
+historical recorded value:
+
+b5a30674eaf774a5a04677ab8c638001c5b68c7fd508176166f0cdb296aa540f
+
+This document does not independently reverify the
+Stage 3 archive or its contents.
+
+Stage 2 hash discrepancies remain unresolved.
+
+Independent verification of Baseline 10.7 remains
+unresolved.
+
+No claim of current source integrity or Baseline integrity
+is created by this revision.
+
+
+============================================================
+10. GOVERNANCE AND IMPLEMENTATION RESTRICTIONS
+============================================================
+
+This revision grants NONE of the following permissions:
+
+- Execution of new code.
+- Modification of existing code.
+- Execution of tests or scripts.
+- Migration.
+- Creation or opening of any database.
+- Schema or metadata modification.
+- Backup or Restore.
+- Provider connection.
+- Real API requests.
+- Production activation.
+- Modification or removal of S3-2.
+- Execution of Redelivery or Resubmission.
+- Stage 4 or C4.
+- Modification or promotion of Baseline 10.7.
+- Changes to public ErrorCodes.
+- Modification of the four-database architecture.
+- Implementation of any unresolved mechanism.
+
+G1 — DATABASE CREATION
+
+Creation of any database, including temporary databases,
+requires explicit authorization for that action.
+
+G2 — SCHEMA MODIFICATION
+
+Any Schema modification, including temporary copies,
+requires explicit authorization.
+
+G3 — MIGRATION
+
+Any Migration, including temporary or copied databases,
+requires explicit authorization.
+
+G4 — BACKUP AND RESTORE
+
+Backup or Restore involving real data requires explicit
+authorization.
+
+G5 — PRODUCTION INTEGRATION
+
+Production integration requires explicit authorization.
+
+G6 — DISPOSABLE OPEN-ORDER TEST
+
+A Disposable Open-Order test requires explicit
+authorization.
+
+G7 — BASELINE CHANGE
+
+Any Baseline modification or promotion requires explicit
+authorization.
+
+G8 — IMPLEMENTATION PHASE AUTHORIZATION
+
+Every implementation phase requires separate, explicit
+owner approval.
+
+This applies even to read-only or test-only implementation
+phases.
+
+Approval of one phase does not authorize the next phase.
+
+No authorization may be inferred from a previous approval
+unless its scope explicitly includes the action in question.
+
+AUTHORIZATION SCOPE RULE
+
+Every authorization must identify its specific scope,
+phase, and permitted action.
+
+Authorization for one action does not automatically extend
+to another action or a later phase.
+
+Database restrictions G1 through G7 remain independently
+applicable in addition to G8.
+
+
+============================================================
+11. FINAL STATUS REGISTER
+============================================================
+
+P1-A through P1-C2:
+OWNER APPROVED
+
+P2-C1 and P2-C2:
+OWNER APPROVED
+
+P2-D1 through P2-D3:
+OWNER APPROVED
+
+P3-A through P3-C:
+OWNER APPROVED
+
+R-2A and R-2B:
+OPEN
+
+R-4 through R-9:
+OPEN
+
+P4-A1 and P4-A2:
+OPEN
+
+D-03 and D-04:
+OPEN
+
+S3-2:
+CONFLICT RECORDED — NO ACTION AUTHORIZED
+
+S3-3:
+UNRESOLVED — NO ACTION AUTHORIZED
+
+S3-4:
+UNVERIFIED HISTORICAL REFERENCE
+
+Four-database target:
+OWNER-APPROVED ARCHITECTURAL DIRECTION
+
+Four-database implementation:
+NOT AUTHORIZED
+
+Stage 4 / C4:
+NOT AUTHORIZED
+
+Implementation:
+NOT AUTHORIZED
+
+Database operations:
+NOT AUTHORIZED
+
+Production Integration:
+NOT AUTHORIZED
+
+Baseline Promotion:
+NOT AUTHORIZED
+
+Provider Calls:
+NOT AUTHORIZED
+
+Real API Requests:
+NOT AUTHORIZED
+
+
+============================================================
+12. DOCUMENT STATUS DECLARATION
+============================================================
+
+r4.5.2 is a proposed documentation clarification revision.
+
+It:
+
+- Records previously owner-approved P1, P2, and P3
+  decisions.
+- Clarifies current and historical decision identifiers.
+- Separates approved decisions from unresolved topics.
+- Records known architectural conflicts without authorizing
+  operational changes.
+- Clarifies the approved four-database target architecture.
+- Preserves all existing Governance restrictions.
+- Does not approve new technical mechanisms.
+- Does not grant implementation authorization.
+
+The individual P1, P2, and P3 decisions remain owner-approved
+within their explicitly defined scopes.
+
+The r4.5.2 document itself remains a proposed documentation
+revision until separately accepted by the project owner.
+
+This document is NOT authorization for:
+
+- Implementation.
+- Code modification.
+- Database creation or modification.
+- Database opening or migration.
+- Test or script execution.
+- Backup or Restore.
+- Redelivery.
+- Resubmission.
+- Provider calls.
+- Production Integration.
+- Stage 4 / C4.
+- Baseline modification or promotion.
+
+IMPLEMENTATION AUTHORIZATION: NONE
+
+END OF DOCUMENT

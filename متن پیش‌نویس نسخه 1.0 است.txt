@@ -1,0 +1,788 @@
+
+SANOUR AI SAFETY, CONTROL & GOVERNANCE ARCHITECTURE
+
+Document Version: 1.0
+Document Status: PROPOSED ARCHITECTURE DOCUMENT
+Document Type: Independent Safety, Control and Governance Architecture
+Date: 2026-11-12
+
+BASELINE STATUS: UNCHANGED
+IMPLEMENTATION AUTHORIZATION: NONE
+DATABASE AUTHORIZATION: NONE
+PRODUCTION AUTHORIZATION: NONE
+
+
+============================================================
+1. PURPOSE AND SCOPE
+============================================================
+
+This document defines the proposed foundational safety, control,
+ownership, emergency governance, and succession architecture
+for the SANOUR platform.
+
+SANOUR is intended to be a modular, provider-independent AI
+platform. Its future capabilities may include AI models, Agents,
+tools, external providers, APIs, memory, automation, and
+multilingual services.
+
+The purpose of this architecture is to ensure that:
+
+- AI systems cannot take control of their own governance.
+- Agents cannot expand their own authority without authorization.
+- Independent safety mechanisms remain outside AI control.
+- Human users and legitimate administrators can continue
+  performing normal work wherever safe.
+- Sensitive operations remain protected during failures.
+- Ownership and emergency succession are governed by explicit,
+  traceable rules.
+- No single AI, Agent, administrator, or unauthorized person can
+  remove all independent safety protections.
+
+This document defines architectural principles and approved
+owner decisions. It does not define or authorize implementation.
+
+
+============================================================
+2. FOUNDATIONAL GOVERNANCE PRINCIPLE
+============================================================
+
+No AI system, Agent, autonomous process, or external provider
+may independently change, remove, weaken, disable, or bypass
+SANOUR's independent control and safety mechanisms.
+
+Final governance authority must remain outside AI control.
+
+Accordingly:
+
+1. AI cannot modify its own foundational security policies.
+2. AI cannot increase its own privileges without authorization.
+3. AI cannot create Agents with greater privileges without
+   authorization.
+4. AI cannot disable or bypass independent safety controls.
+5. Sensitive actions require valid authorization before execution.
+6. An independent mechanism must be capable of stopping or
+   limiting AI activities.
+7. Restarting sensitive AI activities after a dangerous incident
+   requires human review and appropriate authorization.
+
+No absolute security guarantee is claimed. Compromise of the
+operating system, hardware, credentials, cryptographic keys,
+or independent control infrastructure remains a possible risk
+that must be addressed through technical design.
+
+
+============================================================
+3. SEPARATION OF AUTHORITY DOMAINS
+============================================================
+
+The proposed SANOUR architecture separates three domains.
+
+3.1 AI DOMAIN
+
+Responsible for:
+
+- Reasoning and analysis.
+- Processing authorized tasks.
+- Using permitted tools.
+- Producing recommendations and outputs.
+- Operating within assigned permissions and resource limits.
+
+The AI domain cannot govern or modify the independent safety
+domain.
+
+3.2 INDEPENDENT CONTROL AND SAFETY DOMAIN
+
+Responsible for:
+
+- Authorization enforcement.
+- Access control.
+- Resource and execution limits.
+- Restrictions on sensitive operations.
+- Emergency stop and containment.
+- Independent control of AI and Agent access to tools,
+  providers, networks, and sensitive operations.
+
+This domain must not depend on AI decisions for its own
+security enforcement.
+
+3.3 HUMAN GOVERNANCE DOMAIN
+
+Responsible for:
+
+- Approving foundational policies.
+- Defining authorized roles.
+- Approving exceptional permissions.
+- Reviewing serious incidents.
+- Approving changes to foundational safety rules.
+- Governing ownership and succession.
+
+AI systems and Agents cannot replace this authority.
+
+
+============================================================
+4. INDEPENDENT EMERGENCY SAFETY LAYER
+============================================================
+
+SANOUR shall be designed with an independent Emergency Safety
+Layer.
+
+This layer must be:
+
+- Independent of AI reasoning and Agent decisions.
+- Bounded in authority.
+- Designed to control high-risk operations.
+- Capable of limiting or stopping AI access to sensitive tools,
+  providers, networks, and operations.
+- Protected against unauthorized modification.
+- Subject to human governance.
+
+It must not become an unrestricted authority that can
+unnecessarily block ordinary user activity.
+
+4.1 PROPORTIONAL CONTROL
+
+Restrictions must be limited to the smallest affected scope.
+
+Preferred restriction order:
+
+1. Restrict the affected Agent.
+2. Restrict the affected Provider or execution path.
+3. Preserve healthy independent user services.
+4. Stop a wider system only when systemic risk requires it.
+
+Every restriction should record:
+
+- Cause.
+- Affected scope.
+- Remaining available functions.
+- Responsible authority.
+- Start time.
+- Review time.
+- Conditions required to remove the restriction.
+
+4.2 PROTECTION OF NORMAL USERS
+
+Emergency controls must not unnecessarily prevent ordinary
+users or legitimate administrators from using healthy services.
+
+The safety layer controls AI and high-risk operations, not
+unrelated healthy user functions.
+
+Security restrictions must be proportional and scope-limited.
+
+
+============================================================
+5. FAILURE OF THE EMERGENCY SAFETY LAYER
+============================================================
+
+Approved architectural principle:
+
+FAIL SAFE, NOT FAIL OPEN.
+
+If the Emergency Safety Layer becomes unavailable:
+
+1. Sensitive operations must stop or remain restricted until
+   valid control is restored.
+2. Healthy and independent low-risk services may continue
+   where their safety can be established.
+3. Agents cannot acquire new privileges or permissions.
+4. Providers and external tools cannot initiate new sensitive
+   operations without valid authorization.
+5. Evidence and records relating to the failure must be preserved.
+6. Resumption of sensitive operations requires review of the
+   control layer's health and approval by an authorized human.
+
+The safety architecture should avoid making the Emergency Safety
+Layer a single point of failure.
+
+However, the technical method for achieving resilience,
+redundancy, independent monitoring, and safe degradation
+requires a separate technical design.
+
+No automatic recovery or permission expansion is authorized.
+
+
+============================================================
+6. HUMAN AND ADMINISTRATIVE CONTROL
+============================================================
+
+Administrative access must not equal unlimited authority.
+
+The following principles apply:
+
+1. An ordinary administrator cannot disable the Emergency
+   Safety Layer.
+2. Changes to foundational safety policies require approval
+   from the SANOUR architecture owner or an explicitly
+   designated governance authority.
+3. Highly sensitive operations should require approval from
+   two independent people where feasible.
+4. Important administrative decisions must be recorded.
+5. No administrator or Agent may independently remove all
+   safety protections.
+6. Administrative privileges must be limited to their defined
+   responsibilities.
+
+The detailed role model, authentication mechanisms, approval
+workflow, and permission matrix remain subject to technical
+design.
+
+
+============================================================
+7. PROTECTION OF THE OWNER'S ACCOUNT
+============================================================
+
+The owner's account is a critical governance identity.
+
+The following protections are approved as architectural
+requirements:
+
+1. Strong multi-factor authentication.
+2. Re-authentication for critical changes.
+3. Independent recovery keys stored securely and offline.
+4. Security delays for highly sensitive changes, with an
+   opportunity to cancel them.
+5. Traceable records of requests, approvals, and outcomes.
+6. Suspicious critical changes must be suspended pending
+   human review.
+7. These controls must not unnecessarily complicate ordinary
+   user access.
+
+Possession of the owner's ordinary account credentials alone
+must not automatically provide unrestricted authority to
+change every foundational safety mechanism.
+
+Technical details of authentication, key custody, delay
+periods, and suspicious-activity detection remain unresolved.
+
+
+============================================================
+8. EMERGENCY OWNER RECOVERY
+============================================================
+
+If the owner loses access to a password, authentication device,
+or primary key, SANOUR must provide an emergency recovery path.
+
+Approved principles:
+
+1. Recovery must be independent of AI and Agent decisions.
+2. Recovery keys must be securely maintained offline.
+3. Identity recovery requires multiple independent forms of
+   evidence or authentication factors.
+4. Ordinary administrators and Agents cannot appoint a new owner.
+5. All recovery steps must be recorded and auditable.
+6. Critical authority must not be transferred before identity
+   verification is completed.
+
+The detailed recovery procedure, evidence standards, custody
+arrangements, and applicable legal requirements require
+separate design.
+
+
+============================================================
+9. EMERGENCY SUCCESSION AND PERMANENT OWNERSHIP
+============================================================
+
+Emergency succession and permanent ownership transfer are
+separate processes.
+
+9.1 EMERGENCY SUCCESSION
+
+The owner may designate an emergency successor or trustee
+in advance.
+
+The successor's authority is limited to the defined emergency
+responsibilities required to preserve SANOUR's security and
+continuity.
+
+The emergency successor:
+
+- Does not automatically become permanent owner.
+- Cannot transfer permanent ownership.
+- Cannot weaken foundational safety policies.
+- Cannot bypass Zero Automatic Retry.
+- Cannot appoint a new permanent owner.
+- Cannot use emergency authority to expand personal privileges.
+
+9.2 ACTIVATION OF EMERGENCY SUCCESSION
+
+The owner's absence alone does not activate the successor.
+
+Activation requires:
+
+1. Verification of the owner's unavailability under
+   predefined conditions.
+2. Independent verification of the successor's identity.
+3. Approval by an independent authorized human authority.
+
+No Agent may activate, cancel, or modify the successor's mandate.
+
+9.3 END OF EMERGENCY SUCCESSION
+
+Ending the emergency mandate also requires independent
+human approval.
+
+The owner's return does not automatically erase records
+or silently transfer authority.
+
+The beginning, scope, decisions, and end of the emergency
+mandate must remain traceable.
+
+
+============================================================
+10. PERMANENT SUCCESSION
+============================================================
+
+Permanent ownership transfer is distinct from emergency
+succession.
+
+Approved principles:
+
+1. An emergency successor does not automatically become
+   permanent owner.
+2. Permanent transfer requires a valid succession document
+   established and approved in advance by the owner.
+3. The validity of the document must be assessed using
+   independent evidence.
+4. If no valid document exists, transfer must stop.
+5. If a material dispute exists, transfer must stop pending
+   proper resolution.
+6. AI systems, Agents, and ordinary administrators cannot
+   appoint a new permanent owner.
+7. Applicable laws and the legal rights of relevant persons
+   must be respected.
+
+A permanent transfer cannot be inferred from technical
+possession of an account, device, key, or server.
+
+
+============================================================
+11. INDEPENDENT PERMANENT SUCCESSION AUTHORITY
+============================================================
+
+A separate authority shall be designated to review and
+approve permanent ownership succession.
+
+This authority must be independent of:
+
+- AI systems and Agents.
+- Ordinary system administration.
+- Any individual applicant seeking ownership.
+
+Its responsibilities include:
+
+1. Reviewing the succession document.
+2. Reviewing relevant legal and identity evidence.
+3. Identifying conflicts or disputed claims.
+4. Suspending transfer when evidence is insufficient.
+5. Recording its review and final decision.
+6. Maintaining an auditable record of the process.
+
+Approval of succession does not automatically grant the
+authority permission to modify foundational safety policies.
+
+The legal status, jurisdiction, and formal constitution of
+this authority require separate legal and governance design.
+
+
+============================================================
+12. MEMBERSHIP OF THE SUCCESSION AUTHORITY
+============================================================
+
+Approved structure:
+
+- Three principal members.
+- Two designated alternate members.
+
+12.1 APPOINTMENT
+
+The owner appoints the initial members.
+
+Alternates are designated in advance.
+
+AI systems and Agents have no role in selecting, appointing,
+or dismissing members.
+
+12.2 VOTING
+
+A permanent ownership transfer requires at least two
+affirmative votes from three valid and eligible members.
+
+No single member can approve a transfer independently.
+
+A member with a conflict of interest cannot vote on the
+affected case.
+
+If the number of valid and independent members is insufficient,
+the transfer must stop.
+
+12.3 INDEPENDENCE
+
+Multiple accounts alone do not establish independent approval.
+
+Members must have:
+
+- Independently verifiable identities.
+- Independent authentication methods.
+- Separate individual credentials.
+- No shared approval credentials.
+- A duty to disclose relevant conflicts of interest.
+
+No Agent may cast a vote or approve a decision on behalf
+of a member.
+
+Evidence of collusion or material conflict requires suspension
+of the sensitive decision and human review.
+
+
+============================================================
+13. MEMBER QUALIFICATION
+============================================================
+
+Members must:
+
+1. Have a verifiable real identity.
+2. Declare independence and relevant conflicts of interest.
+3. Understand their legal and security responsibilities.
+4. Maintain independent accounts and authentication methods.
+5. Never delegate their vote to an Agent or another person.
+6. Remain qualified throughout their appointment.
+
+Family, friendship, or professional relationships alone
+do not automatically establish or disqualify eligibility.
+
+Actual independence and case-specific conflicts must be
+assessed.
+
+Loss of qualification requires replacement through the
+recorded governance process.
+
+
+============================================================
+14. RESIGNATION, REMOVAL AND REPLACEMENT
+============================================================
+
+Approved principles:
+
+1. A member may formally resign.
+2. Death, incapacity, or loss of qualification may trigger
+   the replacement review process.
+3. Removal requires documented grounds and an independent
+   procedure.
+4. No member may unilaterally remove another member.
+5. A member under review cannot participate in the sensitive
+   decision affected by that review.
+6. Changes in membership must be recorded.
+7. Historical decisions and records must be preserved.
+8. If enough qualified members are unavailable, permanent
+   transfer remains suspended.
+
+14.1 ALTERNATE MEMBERS
+
+An alternate initially completes only the remaining term
+of the replaced principal member.
+
+Entry into the authority requires formal recording and
+a renewed qualification review.
+
+Any subsequent independent appointment begins a new
+five-year term only after valid selection.
+
+Replacement must not create automatic or unlimited extensions
+of authority.
+
+
+============================================================
+15. TERMS OF APPOINTMENT
+============================================================
+
+Approved appointment structure:
+
+- Principal member term: five years.
+- One renewal may be permitted after independent evaluation.
+- Qualification and conflict-of-interest review: annually.
+- Alternate members must maintain their qualifications.
+
+Expiry of a term does not itself create new authority.
+
+If the authority does not have enough valid members, it
+cannot approve permanent ownership transfer until a valid
+composition is restored.
+
+The process for evaluating renewal and appointing replacements
+requires further governance documentation.
+
+
+============================================================
+16. DISAGREEMENT AND CONFLICT RESOLUTION
+============================================================
+
+If members disagree on a sensitive decision:
+
+1. No member may independently execute the decision.
+2. The request remains suspended until the disagreement
+   is properly resolved.
+3. The matter is referred to a higher authorized governance
+   authority.
+4. Evidence, objections, and reasons from each side are
+   preserved.
+5. Silence or passage of time is not approval.
+6. If the disagreement remains unresolved, the sensitive
+   operation does not proceed.
+7. Healthy independent services may continue where safe.
+
+No AI system or Agent may resolve a governance disagreement
+by independently selecting a winning position.
+
+
+============================================================
+17. ZERO AUTOMATIC RETRY AND SAFETY GOVERNANCE
+============================================================
+
+This architecture must remain consistent with SANOUR's
+approved Zero Automatic Retry principle.
+
+The initial authorized logical effect is the first attempt,
+admitted under existing admission and governance rules.
+
+Any subsequent external write or delivery for the same
+logical effect is a subsequent attempt.
+
+System-initiated subsequent attempts are prohibited.
+
+A subsequent attempt requires its own specific, recorded,
+per-instance authorization under separate governance.
+
+This principle includes:
+
+- Financial and external effects.
+- Provider requests.
+- Audit Sink delivery.
+- Lease expiry and reclaim paths.
+- Startup replay.
+- Redelivery and resubmission.
+
+UNKNOWN never automatically becomes failure or permission
+to resend.
+
+No emergency, succession, administrative, or ownership
+mechanism may bypass Zero Automatic Retry.
+
+The detailed authorization mechanism remains subject to
+separate governance and technical design.
+
+
+============================================================
+18. AUDITABILITY AND EVIDENCE
+============================================================
+
+Important governance and safety events must be traceable.
+
+Records should preserve, where applicable:
+
+- Actor identity.
+- Action requested.
+- Scope of authority.
+- Approval or refusal.
+- Reason.
+- Evidence reference.
+- Time of request and decision.
+- Relevant affected operation.
+- Result and subsequent review.
+
+Historical records must not be silently overwritten or deleted.
+
+Corrections must be recorded as separate traceable events
+linked to the original record.
+
+Sensitive credentials, passwords, API keys, and raw
+authentication secrets must never be stored in audit records.
+
+Access to confidential audit information must itself be
+auditable.
+
+Technical storage, cryptographic integrity, retention,
+access control, and verification mechanisms require
+separate design.
+
+
+============================================================
+19. INCIDENT RESPONSE AND SAFE HALT
+============================================================
+
+When a serious safety, security, accounting, or audit
+incident occurs, SANOUR must be capable of restricting
+the affected operation or module.
+
+The preferred approach is to stop only the affected scope,
+not the entire system, when safe isolation is possible.
+
+Approved priority order:
+
+1. Prevent unintended or duplicate financial effects.
+2. Preserve audit evidence and history.
+3. Contain security risk.
+4. Preserve healthy independent services.
+5. Recover only after review, evidence, and authorization.
+
+A partially completed transaction must not be automatically
+completed or repeated.
+
+UNKNOWN must not be automatically changed.
+
+19.1 SAFE RESUME
+
+Resuming an affected sensitive operation requires:
+
+- The cause to be identified.
+- Credible evidence that the risk has been resolved.
+- The affected operation's status to be assessed.
+- The risk of unintended repetition or external effect to
+  be addressed.
+- An authorized person to record the reason and approval.
+
+Resuming a service does not authorize repeating an old
+external operation.
+
+UNKNOWN remains subject to its own evidence and decision rules.
+
+19.2 RESUME AUTHORITY
+
+The proposed responsibility mapping is:
+
+- Financial/accounting risk: authorized finance or accounting lead.
+- Security risk: security lead.
+- Audit/evidence integrity risk: audit lead.
+- Cross-domain or conflicting authority: architecture owner
+  or governance authority designated by the owner.
+
+None of these authorities may bypass Zero Automatic Retry.
+
+
+============================================================
+20. TECHNICAL DESIGN ITEMS STILL OPEN
+============================================================
+
+The following details are not yet technically approved:
+
+1. Independent safety-layer implementation.
+2. Resilience and redundancy design.
+3. Safe degradation when safety components fail.
+4. Separation of control-plane and AI execution-plane.
+5. Authentication and key-management mechanisms.
+6. Owner recovery evidence and custody process.
+7. Formal legal structure of permanent succession.
+8. Legal jurisdiction and applicable succession requirements.
+9. Secure appointment and replacement workflows.
+10. Independent authentication requirements for members.
+11. Voting workflow and evidence validation.
+12. Conflict-of-interest assessment procedure.
+13. Emergency activation and termination workflow.
+14. Audit record integrity and cryptographic verification.
+15. Incident notification and escalation.
+16. Retention and deletion policies.
+17. Technical separation of sensitive and ordinary services.
+18. Verification of safety controls against unauthorized
+    modification by privileged software.
+
+An architectural principle does not automatically approve
+a technical mechanism.
+
+
+============================================================
+21. IMPLEMENTATION AND DATABASE RESTRICTIONS
+============================================================
+
+This document does not authorize:
+
+- Source code changes.
+- Project file modifications.
+- Database creation or opening.
+- Database schema changes.
+- Database migration.
+- Database backup or restore.
+- Test execution or scripts.
+- Provider or external API calls.
+- Production integration or activation.
+- Stage 4 or C4.
+- Baseline 10.7 modification or promotion.
+- Changes to existing operational retry or delivery mechanisms.
+
+Every implementation or inspection phase requires its own
+explicit authorization under G8.
+
+Database restrictions G1-G7 remain in force.
+
+No permission may be inferred from approval of this document
+or from approval of an individual architectural principle.
+
+
+============================================================
+22. DECISION STATUS
+============================================================
+
+OWNER-APPROVED IN CHAT:
+
+- AI cannot govern or weaken its independent safety controls.
+- Independent Control and Safety domain.
+- Proportional emergency restrictions preserving healthy
+  user services.
+- Fail Safe, Not Fail Open.
+- Avoidance of a single point of failure in the safety layer
+  as an architectural objective.
+- Limits on ordinary administrator authority.
+- Protection of the owner's account.
+- Independent emergency owner recovery.
+- Emergency succession separate from permanent ownership.
+- Independent human approval for activation and termination
+  of emergency succession.
+- Independent succession authority.
+- Three principal members and two alternates.
+- Minimum two affirmative votes from three valid members.
+- Independent member identity and qualification.
+- Rules for conflicts, resignation, removal, and replacement.
+- Five-year principal member term with one possible renewal.
+- Annual qualification and conflict review.
+- Alternate member term completion rules.
+- Suspension of sensitive decisions during unresolved disputes.
+- No AI or Agent authority in succession decisions.
+- Continued application of Zero Automatic Retry.
+
+PROPOSED OR REQUIRING FURTHER DESIGN:
+
+- Detailed technical mechanisms.
+- Legal constitution of succession authority.
+- Jurisdiction and legal validation.
+- Detailed appointment and replacement procedures.
+- Technical redundancy and failure recovery.
+- Voting and evidence validation implementation.
+- Detailed role and permission matrix.
+- Formal document integration with the SANOUR Master
+  Architecture Decision Register.
+
+
+============================================================
+23. FINAL DOCUMENT STATUS
+============================================================
+
+This document is a proposed architecture record.
+
+Individual principles and decisions listed as
+OWNER-APPROVED IN CHAT reflect the owner's explicit
+approvals in the conversation.
+
+Approval of those principles does not mean that every
+technical mechanism has been designed or approved.
+
+This document itself remains PROPOSED until separately
+reviewed and accepted by the owner.
+
+No implementation, database operation, production activation,
+Stage 4/C4, or Baseline modification is authorized.
+
+IMPLEMENTATION AUTHORIZATION: NONE
+DATABASE AUTHORIZATION: NONE
+PRODUCTION AUTHORIZATION: NONE
+BASELINE CHANGE AUTHORIZATION: NONE
+
+END OF DOCUMENT
