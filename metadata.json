@@ -1,0 +1,8 @@
+{
+  "name": "Remix SANOUR AI - Test \u0026 Execution Verification",
+  "description": "بررسی، اجرا و راستی‌آزمایی جامع فریم‌ورک SANOUR AI همراه با گزارش زنده تست‌های واحد و یکپارچگی (۲۳۰/۲۳۰ پاس شده).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

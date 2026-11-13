@@ -1,0 +1,20 @@
+--- /tmp/sanour_step10_2/SANOUR_AI/tests/unit/test_production_composition.py	2026-11-06 06:48:34.000000000 +0000
++++ /app/applet/sanour_ai_source/tests/unit/test_production_composition.py	2026-11-06 07:07:43.274598173 +0000
+@@ -122,11 +122,12 @@
+ 
+     def test_output_limit_equal_to_context_limit_is_not_a_config_error_here(self):
+         # Equal is consistent. The SDK check (below) is the only thing that can fail after this.
+-        with self.assertRaises(ConfigError) as ctx:
+-            prod.build_production_core(
+-                _env(SANOUR_OPENAI_MAX_CONTEXT_TOKENS="100", SANOUR_OPENAI_MAX_OUTPUT_TOKENS="100")
+-            )
+-        self.assertNotIn("must not be greater", str(ctx.exception))
++        with mock.patch.object(prod, "_sdk_present", return_value=False):
++            with self.assertRaises(ConfigError) as ctx:
++                prod.build_production_core(
++                    _env(SANOUR_OPENAI_MAX_CONTEXT_TOKENS="100", SANOUR_OPENAI_MAX_OUTPUT_TOKENS="100")
++                )
++            self.assertNotIn("must not be greater", str(ctx.exception))
+ 
+ 
+ class ModelIdValidationTests(unittest.TestCase):
