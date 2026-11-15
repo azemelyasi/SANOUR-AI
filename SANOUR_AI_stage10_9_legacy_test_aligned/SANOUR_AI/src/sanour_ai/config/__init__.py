@@ -1,0 +1,1 @@
+"""Minimal typed runtime settings."""

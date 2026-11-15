@@ -1,0 +1,146 @@
+diff -ruN baseline/SANOUR_AI/src/sanour_ai/models/gateway.py package/SANOUR_AI/src/sanour_ai/models/gateway.py
+--- baseline/SANOUR_AI/src/sanour_ai/models/gateway.py	2026-11-06 07:01:20.000000000 +0000
++++ package/SANOUR_AI/src/sanour_ai/models/gateway.py	2026-11-06 11:13:23.736484740 +0000
+@@ -164,7 +164,7 @@
+         with self._lock:
+             if code is ErrorCode.PROVIDER_TIMEOUT:
+                 self._timeout_outcomes += 1
+-            elif code is ErrorCode.PROVIDER_FAILED:
++            elif code in (ErrorCode.PROVIDER_FAILED, ErrorCode.PROVIDER_RATE_LIMITED):
+                 self._provider_failures += 1
+             elif code is ErrorCode.PROVIDER_OVERLOADED:
+                 self._overloads += 1
+@@ -288,8 +288,14 @@
+         if "error" in outcome:
+             exc = outcome["error"]
+             retryable = isinstance(exc, ProviderError) and exc.retryable
++            code = (
++                ErrorCode.PROVIDER_RATE_LIMITED
++                if isinstance(exc, ProviderError)
++                and getattr(exc, "error_code", None) == ErrorCode.PROVIDER_RATE_LIMITED.value
++                else ErrorCode.PROVIDER_FAILED
++            )
+             raise SanourError(
+-                ErrorCode.PROVIDER_FAILED, "model provider failed", retryable=retryable
++                code, "model provider failed", retryable=retryable
+             )
+ 
+         result = outcome.get("result")
+diff -ruN baseline/SANOUR_AI/src/sanour_ai/providers/openai_provider.py package/SANOUR_AI/src/sanour_ai/providers/openai_provider.py
+--- baseline/SANOUR_AI/src/sanour_ai/providers/openai_provider.py	2026-11-06 07:01:20.000000000 +0000
++++ package/SANOUR_AI/src/sanour_ai/providers/openai_provider.py	2026-11-06 11:13:52.016754089 +0000
+@@ -34,7 +34,7 @@
+ 
+ 
+ class RateLimitedError(ProviderError):
+-    """Raised for HTTP 429. The gateway still reports PROVIDER_FAILED until it maps this code."""
++    """Raised for HTTP 429. The gateway preserves its provider_rate_limited code."""
+ 
+     error_code = "provider_rate_limited"
+ 
+diff -ruN baseline/SANOUR_AI/tests/integration/test_core_flow.py package/SANOUR_AI/tests/integration/test_core_flow.py
+--- baseline/SANOUR_AI/tests/integration/test_core_flow.py	2026-11-06 07:01:20.000000000 +0000
++++ package/SANOUR_AI/tests/integration/test_core_flow.py	2026-11-06 11:13:52.456758285 +0000
+@@ -8,6 +8,7 @@
+ from sanour_ai.models.gateway import ModelGateway
+ from sanour_ai.models.router import DeterministicRouter
+ from sanour_ai.observability.audit import AuditLogger
++from sanour_ai.providers.openai_provider import RateLimitedError
+ from tests.mock_provider import TEST_FAKE_SECRET, MockBehavior, MockProvider, build_mock_core
+ from tests.support import TOLERANCE_SECONDS, GatedProvider, wait_until
+ 
+@@ -73,6 +74,40 @@
+         self.assertNotIn(TEST_FAKE_SECRET, resp.model_dump_json())
+         self.assertNotIn("Traceback", resp.model_dump_json())
+ 
++    def test_rate_limit_is_safe_in_response_and_audit_and_attempted_once(self):
++        raw_detail = "429 api_key=sk-FAKETESTKEY0123456789 raw provider response"
++
++        class TestOnlyRateLimitedProvider:
++            name = "mock"
++
++            def __init__(self):
++                self.call_count = 0
++
++            def generate(self, call):
++                self.call_count += 1
++                raise RateLimitedError(raw_detail, retryable=True)
++
++        provider = TestOnlyRateLimitedProvider()
++        backup = MockProvider(name="backup")
++        core = make_core(
++            {"mock": provider, "backup": backup},
++            [
++                profile("test_model", "mock", priority=100),
++                profile("backup_model", "backup", priority=200),
++            ],
++        )
++        with self.assertLogs("sanour_ai.audit", level="INFO") as logs:
++            resp = core.handle({"prompt": "hi"})
++        self.assertEqual(resp.error.code, ErrorCode.PROVIDER_RATE_LIMITED)
++        self.assertTrue(resp.error.retryable)
++        self.assertEqual(provider.call_count, 1)
++        self.assertEqual(backup.call_count, 0)
++        self.assertNotIn(raw_detail, resp.model_dump_json())
++        self.assertNotIn("FAKETESTKEY", resp.model_dump_json())
++        self.assertNotIn(raw_detail, "\n".join(logs.output))
++        self.assertNotIn("FAKETESTKEY", "\n".join(logs.output))
++        self.assertIn("provider_rate_limited", "\n".join(logs.output))
++
+     def test_total_deadline_holds_within_tolerance(self):
+         provider = MockProvider(name="mock", behavior=MockBehavior.SLOW, delay_seconds=2.0)
+         core = make_core({"mock": provider}, [profile("test_model", "mock")])
+diff -ruN baseline/SANOUR_AI/tests/integration/test_production_openai_path.py package/SANOUR_AI/tests/integration/test_production_openai_path.py
+--- baseline/SANOUR_AI/tests/integration/test_production_openai_path.py	2026-11-06 07:01:20.000000000 +0000
++++ package/SANOUR_AI/tests/integration/test_production_openai_path.py	2026-11-06 11:13:23.296480544 +0000
+@@ -108,7 +108,7 @@
+     def test_rate_limit_is_reported_retryable_with_no_retry(self):
+         self.reply = lambda request: self._httpx2.Response(429, json={"error": {"message": "slow"}})
+         response = self._build().handle({"prompt": "hi"})
+-        self.assertEqual(response.error.code, ErrorCode.PROVIDER_FAILED)
++        self.assertEqual(response.error.code, ErrorCode.PROVIDER_RATE_LIMITED)
+         self.assertTrue(response.error.retryable)
+         self.assertEqual(len(self.requests), 1)
+ 
+diff -ruN baseline/SANOUR_AI/tests/unit/test_gateway.py package/SANOUR_AI/tests/unit/test_gateway.py
+--- baseline/SANOUR_AI/tests/unit/test_gateway.py	2026-11-06 07:01:20.000000000 +0000
++++ package/SANOUR_AI/tests/unit/test_gateway.py	2026-11-06 11:13:29.232537080 +0000
+@@ -5,6 +5,7 @@
+ from sanour_ai.models.base import ModelCall, ModelResult, ProviderError
+ from sanour_ai.models.capabilities import ModelCapabilities, ModelProfile
+ from sanour_ai.models.gateway import MAX_RESULT_CHARS, ModelGateway
++from sanour_ai.providers.openai_provider import RateLimitedError
+ from tests.mock_provider import MockBehavior, MockProvider
+ from tests.support import TOLERANCE_SECONDS, GatedProvider, deadline_in, wait_until
+ 
+@@ -25,8 +26,10 @@
+ 
+     def __init__(self, exc):
+         self._exc = exc
++        self.call_count = 0
+ 
+     def generate(self, call):
++        self.call_count += 1
+         raise self._exc
+ 
+ 
+@@ -66,6 +69,19 @@
+         self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_FAILED)
+         self.assertTrue(ctx.exception.retryable)
+ 
++    def test_rate_limit_error_code_and_retryable_are_preserved_without_detail(self):
++        raw_detail = "429 api_key=sk-FAKETESTKEY0123456789 raw provider response"
++        provider = _Raising(RateLimitedError(raw_detail, retryable=True))
++        gw = gateway(provider)
++        with self.assertRaises(SanourError) as ctx:
++            gw.generate(PROFILE, CALL, deadline_in(2.0))
++        self.assertEqual(ctx.exception.code, ErrorCode.PROVIDER_RATE_LIMITED)
++        self.assertTrue(ctx.exception.retryable)
++        self.assertEqual(provider.call_count, 1)
++        self.assertNotIn(raw_detail, ctx.exception.message)
++        self.assertNotIn("FAKETESTKEY", ctx.exception.message)
++        self.assertEqual(gw.stats().provider_failures, 1)
++
+     def test_fatal_provider_error_is_not_retryable(self):
+         gw = gateway(_Raising(ProviderError("bad", retryable=False)))
+         with self.assertRaises(SanourError) as ctx:
